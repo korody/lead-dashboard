@@ -10,6 +10,7 @@ import { InteractiveLineChart } from "../components/charts/interactive-line-char
 import { InteractivePieChart } from "../components/charts/interactive-pie-chart";
 import { InteractiveHorizontalBarChart } from "../components/charts/interactive-horizontal-bar-chart";
 import { ConversionFunnel } from "../components/charts/conversion-funnel";
+import UrgencyMatrix from "../components/ui/urgency-matrix";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   TrendingUp, Users, Target, Send, AlertTriangle, Activity, BarChart3, 
@@ -335,6 +336,29 @@ export default function DashboardPage() {
         </div>
 
         
+
+        {/* Urgency x Intensity Matrix */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.65 }}
+        >
+          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
+            <CardHeader>
+              <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                🧭 Matriz Urgência × Intensidade
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Distribuição de leads por quadrante (Q1..Q4)</p>
+            </CardHeader>
+            <CardContent>
+              <UrgencyMatrix
+                quadrants={metrics?.quadrants || []}
+                storedCount={metrics?.storedDiagnosticsCount || 0}
+                total={metrics?.funil?.etapas?.diagnostico_completo || metrics?.totalLeads || 0}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Advanced Priority Distribution */}
         <motion.div
