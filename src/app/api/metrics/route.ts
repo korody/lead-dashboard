@@ -149,6 +149,28 @@ export async function GET() {
     }
     
     console.log(`✅ Batch loading complete: ${allLeads.length} total leads`)
+
+    // If batch loading returned no rows but the initial HEAD count indicated rows,
+    // it's often due to column-level restrictions or schema mismatch. In that case
+    // re-run a minimal select to recover essential fields for distributions.
+    if ((allLeads.length === 0) && (typeof totalLeads === 'number' && totalLeads > 0)) {
+      try {
+        console.log('Batch returned 0 rows but HEAD count > 0 — retrying minimal select...')
+        const { data: minimalData, error: minimalError } = await supabase
+          .from('quiz_leads')
+          .select('id, created_at, lead_score, is_hot_lead_vip, prioridade, elemento_principal, status_tags, whatsapp_status')
+          .range(0, 9999)
+
+        if (!minimalError && minimalData && minimalData.length > 0) {
+          allLeads = minimalData
+          console.log(`Recovered ${allLeads.length} leads from minimal select`)
+        } else {
+          console.warn('Minimal select failed or returned no rows', minimalError)
+        }
+      } catch (e) {
+        console.error('Error during minimal select fallback:', e)
+      }
+    }
     
     // Fetch dados adicionais para dashboard completo
     const [
