@@ -399,8 +399,9 @@ export async function GET() {
         quiz_completado: total_quiz_completado,
         diagnostico_completo: diagnostico_completo,
         grupos_whatsapp: grupos_whatsapp,
-        // Dados do ActiveCampaign
-        cadastros_pdc: totalInscritosPDV,
+        // Use DB-based completions as the canonical "cadastros" baseline so
+        // absolute numbers remain consistent across the dashboard.
+        cadastros_pdc: diagnostico_completo,
       },
       
       // Taxas de conversão entre etapas
