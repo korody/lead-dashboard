@@ -460,8 +460,8 @@ export async function GET() {
     }
 
     const metrics = {
-      // Use local DB count (diagnósticos/quiz completados) as totalLeads so dashboard numbers reflect Supabase data
-      totalLeads: total_quiz_completado || 0,
+      // Use effectiveDiagnostico (batch length or head count) as totalLeads so dashboard numbers reflect DB data
+      totalLeads: effectiveDiagnostico || 0,
       hotVips,
       avgScore: parseFloat(avgScore.toFixed(1)),
       whatsappSuccess: parseFloat(whatsappSuccess.toFixed(1)),
