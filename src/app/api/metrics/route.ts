@@ -131,6 +131,7 @@ export async function GET() {
         .from('quiz_leads')
         // include diagnostic fields if present in the table
         .select('lead_score, whatsapp_status, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, intensidade_calculada, urgencia_calculada, quadrante')
+        .order('id', { ascending: true })
         .range(start, start + batchSize - 1)
       
       if (batchError) {
@@ -159,6 +160,7 @@ export async function GET() {
         const { data: minimalData, error: minimalError } = await supabase
           .from('quiz_leads')
           .select('id, created_at, lead_score, is_hot_lead_vip, prioridade, elemento_principal, status_tags, whatsapp_status')
+          .order('id', { ascending: true })
           .range(0, 9999)
 
         if (!minimalError && minimalData && minimalData.length > 0) {
@@ -277,6 +279,7 @@ export async function GET() {
         const { data, error } = await supabase
           .from('quiz_leads')
           .select('created_at')
+          .order('created_at', { ascending: true })
           .range(start, start + batchSize - 1)
         
         if (error) {
