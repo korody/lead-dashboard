@@ -408,13 +408,18 @@ export async function GET() {
   const base_total = diagnostico_completo || (typeof totalLeads === 'number' ? totalLeads : 0)
     
     const conv_pdv_diagnostico = base_total > 0
-      ? ((diagnostico_completo / base_total) * 100).toFixed(1)
+      ? Math.min(100, (diagnostico_completo / base_total) * 100).toFixed(1)
       : '0'
-    const conv_diagnostico_grupos = base_total > 0 
-      ? ((grupos_whatsapp / base_total) * 100).toFixed(1) 
+
+    // Groups/SendFlow may return a participant count that exceeds the number of
+    // distinct diagnostics (duplicates across groups, or different counting logic).
+    // Clamp displayed conversion to 100% to avoid confusing >100% rates in the UI.
+    const conv_diagnostico_grupos = base_total > 0
+      ? Math.min(100, (grupos_whatsapp / base_total) * 100).toFixed(1)
       : '0'
+
     const conv_geral = base_total > 0
-      ? ((grupos_whatsapp / base_total) * 100).toFixed(1)
+      ? Math.min(100, (grupos_whatsapp / base_total) * 100).toFixed(1)
       : '0'
     
     const funil = {
@@ -437,13 +442,13 @@ export async function GET() {
       
       // Métricas de perda (drop-off) - todas em relação ao total de cadastros
       perdas: {
-        pdv_diagnostico: base_total - diagnostico_completo,
-        diagnostico_grupos: diagnostico_completo - grupos_whatsapp,
+        pdv_diagnostico: Math.max(0, base_total - diagnostico_completo),
+        diagnostico_grupos: Math.max(0, diagnostico_completo - grupos_whatsapp),
         taxa_perda_pdv_diagnostico: base_total > 0
-          ? (((base_total - diagnostico_completo) / base_total) * 100).toFixed(1)
+          ? Math.max(0, (((base_total - diagnostico_completo) / base_total) * 100)).toFixed(1)
           : '0',
         taxa_perda_diagnostico_grupos: base_total > 0
-          ? (((diagnostico_completo - grupos_whatsapp) / base_total) * 100).toFixed(1)
+          ? Math.max(0, (((diagnostico_completo - grupos_whatsapp) / base_total) * 100)).toFixed(1)
           : '0',
       }
     }
