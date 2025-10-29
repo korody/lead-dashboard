@@ -377,8 +377,11 @@ export async function GET() {
     // Etapa 2: Diagnóstico → Grupos WhatsApp (dados do SendFlow)
     const grupos_whatsapp = totalGruposWhatsApp
     
-    // TODAS as conversões são baseadas no total de cadastros (cadastros_pdc) como 100%
-    const base_total = totalInscritosPDV > 0 ? totalInscritosPDV : diagnostico_completo
+  // TODAS as conversões devem usar o total de diagnósticos/quiz completados
+  // para manter um denominador estável e evitar números quebrados quando
+  // integrações externas (ActiveCampaign) estiverem fora de sincronia.
+  // Usamos `diagnostico_completo` explicitamente como a base das conversões.
+  const base_total = diagnostico_completo
     
     const conv_pdv_diagnostico = base_total > 0
       ? ((diagnostico_completo / base_total) * 100).toFixed(1)
