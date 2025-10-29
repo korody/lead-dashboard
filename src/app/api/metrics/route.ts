@@ -369,19 +369,21 @@ export async function GET() {
     })
     
     // Funil de conversão completo e detalhado (3 etapas)
-    const total_quiz_completado = allLeads?.length || 0
-    
-    // Etapa 1: Cadastro → Diagnóstico Completo (100% pois só temos quem completou)
-    const diagnostico_completo = total_quiz_completado
+  const total_quiz_completado = allLeads?.length || 0
+
+  // If batch loading returned empty but the initial HEAD count query found rows,
+  // fall back to that `totalLeads` value so dashboard denominators aren't zero.
+  const effectiveDiagnostico = total_quiz_completado || (typeof totalLeads === 'number' ? totalLeads : 0)
+
+  // Etapa 1: Cadastro → Diagnóstico Completo (use effectiveDiagnostico as the canonical value)
+  const diagnostico_completo = effectiveDiagnostico
     
     // Etapa 2: Diagnóstico → Grupos WhatsApp (dados do SendFlow)
     const grupos_whatsapp = totalGruposWhatsApp
     
   // TODAS as conversões devem usar o total de diagnósticos/quiz completados
-  // para manter um denominador estável e evitar números quebrados quando
-  // integrações externas (ActiveCampaign) estiverem fora de sincronia.
-  // Usamos `diagnostico_completo` explicitamente como a base das conversões.
-  const base_total = diagnostico_completo
+  // (ou o contar HEAD inicial, se o batch falhar) como denominador estável.
+  const base_total = diagnostico_completo || (typeof totalLeads === 'number' ? totalLeads : 0)
     
     const conv_pdv_diagnostico = base_total > 0
       ? ((diagnostico_completo / base_total) * 100).toFixed(1)
