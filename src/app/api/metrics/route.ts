@@ -314,7 +314,26 @@ export async function GET(request: Request) {
           console.log('📊 Buscando evolução temporal do ActiveCampaign (via updated_date)...')
           const { byDay } = await activeCampaignClient.getRecentContactsByTag(acTagId, numDays)
           
-          // Preencher todos os dias (mesmo com 0)
+          // Se for "Todo o Tempo", mostrar apenas a partir do primeiro lead
+          if (days >= 9999 && Object.keys(byDay).length > 0) {
+            const diasOrdenados = Object.keys(byDay).sort()
+            const primeiraData = diasOrdenados[0]
+            const ultimaData = new Date().toISOString().split('T')[0]
+            
+            const resultado = []
+            const start = new Date(primeiraData)
+            const end = new Date(ultimaData)
+            
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+              const dia = d.toISOString().split('T')[0]
+              resultado.push({ data: dia, leads: byDay[dia] || 0 })
+            }
+            
+            console.log(`✅ Evolução temporal do ActiveCampaign (Todo o Tempo): ${diasOrdenados.length} dias com dados, desde ${primeiraData}`)
+            return resultado
+          }
+          
+          // Caso normal: preencher todos os dias (mesmo com 0)
           const resultado = []
           for(let i=numDays-1;i>=0;i--){ 
             const d = new Date(Date.now()-i*24*60*60*1000) 
@@ -362,6 +381,26 @@ export async function GET(request: Request) {
         porDia[dia] = (porDia[dia]||0)+1 
       })
       
+      // Se for "Todo o Tempo", mostrar apenas a partir do primeiro lead
+      if (days >= 9999 && Object.keys(porDia).length > 0) {
+        const diasOrdenados = Object.keys(porDia).sort()
+        const primeiraData = diasOrdenados[0]
+        const ultimaData = new Date().toISOString().split('T')[0]
+        
+        const resultado = []
+        const start = new Date(primeiraData)
+        const end = new Date(ultimaData)
+        
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          const dia = d.toISOString().split('T')[0]
+          resultado.push({ data: dia, leads: porDia[dia] || 0 })
+        }
+        
+        console.log(`✅ Evolução temporal do Supabase (Todo o Tempo): ${diasOrdenados.length} dias com dados, desde ${primeiraData}`)
+        return resultado
+      }
+      
+      // Caso normal: mostrar últimos N dias
       const resultado = []
       for(let i=numDays-1;i>=0;i--){ 
         const d = new Date(Date.now()-i*24*60*60*1000) 
