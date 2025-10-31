@@ -193,7 +193,7 @@ export default function DashboardPage() {
           <AnimatedStatCard
             title="Total de Leads"
             value={metrics?.totalLeads || 0}
-            previousValue={metrics?.comparison?.totalLeads}
+            previousValue={selectedDays >= 9999 ? undefined : metrics?.comparison?.totalLeads}
             icon={Users}
             color="#6366f1"
             gradient="bg-gradient-to-br from-indigo-500 to-indigo-600"
@@ -205,7 +205,7 @@ export default function DashboardPage() {
           <AnimatedStatCard
             title="Diagnósticos Finalizados"
             value={metrics?.totalDiagnosticos || 0}
-            previousValue={metrics?.comparison?.totalDiagnosticos}
+            previousValue={selectedDays >= 9999 ? undefined : metrics?.comparison?.totalDiagnosticos}
             icon={ClipboardCheck}
             color="#8b5cf6"
             gradient="bg-gradient-to-br from-purple-500 to-purple-600"
@@ -218,11 +218,11 @@ export default function DashboardPage() {
             <AnimatedStatCard
               title="Leads VIP"
               value={metrics?.hotVips || 0}
-              previousValue={metrics?.comparison?.hotVips}
+              previousValue={selectedDays >= 9999 ? undefined : metrics?.comparison?.hotVips}
               icon={Target}
               color="#06b6d4"
               gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
-              subtitle={`Score alto (${selectedDays}d) • Clique para ver`}
+              subtitle={`Score alto (${selectedDays >= 9999 ? 'Todo o Tempo' : `${selectedDays}d`}) • Clique para ver`}
               format="number"
               delay={0.2}
             />
@@ -232,7 +232,7 @@ export default function DashboardPage() {
             <AnimatedStatCard
               title="Conversão Geral"
               value={metrics?.whatsappSuccess || 0}
-              previousValue={metrics?.whatsappSuccess ? metrics.whatsappSuccess - 2.5 : undefined}
+              previousValue={selectedDays >= 9999 ? undefined : (metrics?.whatsappSuccess ? metrics.whatsappSuccess - 2.5 : undefined)}
               icon={BarChart3}
               color="#10b981"
               gradient="bg-gradient-to-br from-green-500 to-emerald-600"
