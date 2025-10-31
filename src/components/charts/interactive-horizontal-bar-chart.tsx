@@ -67,7 +67,7 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
             <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#ffffff' }} />
             {/* further reduced YAxis width to push bars left */}
             <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 14, fill: '#ffffff' }} />
-            <Tooltip content={<HorizontalBarCustomTooltip displayedTotal={displayedTotal} />} />
+            <Tooltip content={<HorizontalBarCustomTooltip displayedTotal={displayedTotal} />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
             <Bar dataKey="value" radius={[8, 8, 8, 8]}>
               {dataWithPercent.map((entry, i) => (
                 <Cell key={i} fill={entry.color} />

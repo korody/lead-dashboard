@@ -25,10 +25,11 @@ interface FunnelData {
 
 interface ConversionFunnelProps {
   data: FunnelData
+  hideWhatsApp?: boolean
 }
 
-export function ConversionFunnel({ data }: ConversionFunnelProps) {
-  const stages = [
+export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunnelProps) {
+  const allStages = [
     {
       id: 'pdv',
       label: 'Total de Cadastros',
@@ -55,7 +56,7 @@ export function ConversionFunnel({ data }: ConversionFunnelProps) {
     {
       id: 'grupos',
       label: 'Grupos WhatsApp',
-      sublabel: 'Conversão Final',
+      sublabel: 'Conversão Final (Total Geral)',
       value: data.etapas.grupos_whatsapp,
       icon: UsersRound,
       color: 'from-green-500 to-green-600',
@@ -64,12 +65,24 @@ export function ConversionFunnel({ data }: ConversionFunnelProps) {
       dropOff: data.perdas.diagnostico_grupos,
       dropOffRate: data.perdas.taxa_perda_diagnostico_grupos,
       status: data.etapas.grupos_whatsapp > 0 ? 'active' : 'pending',
-      description: data.etapas.grupos_whatsapp === 0 ? 'Configure SENDFLOW_CAMPAIGN_ID no .env.local' : undefined
+      description: data.etapas.grupos_whatsapp === 0 ? 'Configure SENDFLOW_CAMPAIGN_ID no .env.local' : 'Nota: SendFlow não fornece filtro por período - mostra total geral'
     }
   ]
 
+  const stages = hideWhatsApp ? allStages.filter(s => s.id !== 'grupos') : allStages
+
   return (
     <div className="space-y-6">
+      {/* Aviso quando WhatsApp está oculto */}
+      {hideWhatsApp && (
+        <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            <strong>Dados de WhatsApp ocultos:</strong> O SendFlow não suporta filtro por período. Para visualizar os grupos WhatsApp (total geral), selecione o período de 30 dias.
+          </p>
+        </div>
+      )}
+      
       {/* Etapas do Funil */}
       <div className="grid gap-4">
         {stages.map((stage, index) => (

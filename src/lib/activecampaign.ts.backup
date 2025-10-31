@@ -1,0 +1,287 @@
+/**
+ * ActiveCampaign Client
+ * Configuração e métodos para integração com ActiveCampaign API
+ */
+
+const AC_API_URL = process.env.ACTIVECAMPAIGN_API_URL // Ex: https://seudominio.api-us1.com
+const AC_API_KEY = process.env.ACTIVECAMPAIGN_API_KEY
+
+interface ActiveCampaignContact {
+  id: string
+  email: string
+  firstName?: string
+  lastName?: string
+  tags?: string[]
+  createdDate: string
+}
+
+export class ActiveCampaignClient {
+  private baseUrl: string
+  private apiKey: string
+
+  constructor() {
+    if (!AC_API_URL || !AC_API_KEY) {
+      console.warn('ActiveCampaign credentials not configured')
+      this.baseUrl = ''
+      this.apiKey = ''
+    } else {
+      this.baseUrl = AC_API_URL.replace(/\/$/, '') // Remove trailing slash
+      this.apiKey = AC_API_KEY
+    }
+  }
+
+  isConfigured(): boolean {
+    return !!(this.baseUrl && this.apiKey)
+  }
+
+  /**
+   * Busca contatos por tag ID
+   * @param tagId - ID da tag no ActiveCampaign
+   * @returns Total de contatos e lista
+   */
+  async getContactsByTag(tagId: number): Promise<{ total: number; contacts: ActiveCampaignContact[] }> {
+    if (!this.isConfigured()) {
+      console.warn('ActiveCampaign not configured, returning mock data')
+      return { total: 0, contacts: [] }
+    }
+
+    try {
+      const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=100`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Api-Token': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`ActiveCampaign API error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      
+      // Buscar total de páginas se houver mais de 100 contatos
+      const total = parseInt(data.meta?.total || '0', 10)
+      
+      return {
+        total,
+        contacts: data.contacts || []
+      }
+    } catch (error: any) {
+      console.error('Error fetching ActiveCampaign contacts:', error)
+      throw new Error(`Failed to fetch contacts: ${error.message}`)
+    }
+  }
+
+  /**
+   * Busca apenas o total de contatos por tag (mais rápido)
+   */
+  async getTotalContactsByTag(tagId: number): Promise<number> {
+    if (!this.isConfigured()) {
+      console.warn('ActiveCampaign not configured, returning 0')
+      return 0
+    }
+
+    try {
+      const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=1`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Api-Token': this.apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        console.error(`ActiveCampaign API error: ${response.status}`)
+        return 0
+      }
+
+      const data = await response.json()
+      const total = parseInt(data.meta?.total || '0', 10)
+      
+      console.log(`ActiveCampaign: ${total} contacts with tag ${tagId}`)
+      
+      return total
+    } catch (error: any) {
+      console.error('Error fetching ActiveCampaign total:', error.message)
+      return 0
+    }
+  }
+
+  /**
+   * Busca contatos por tag e agrupa por campo customizado de data
+   * @param tagId - ID da tag
+   * @param days - Número de dias para trás
+   * @param customFieldId - ID do campo customizado (ex: "BNY2 - Data do Cadastro")
+   */
+  async getContactsByTagAndCustomDate(
+    tagId: number, 
+    days: number = 30, 
+    customFieldId?: string
+  ): Promise<{ total: number; byDay: Record<string, number> }> {
+    if (!this.isConfigured()) {
+      return { total: 0, byDay: {} }
+    }
+
+    try {
+      console.log(`📊 ActiveCampaign: Método OTIMIZADO - Buscando field values diretamente...`)
+      
+      if (!customFieldId) {
+        console.warn('⚠️ Campo customizado não configurado. Voltando para created_date.')
+        // Fallback para método antigo
+        return this.getRecentContactsByCreatedDate(tagId, days)
+      }
+      
+      const byDay: Record<string, number> = {}
+      const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      const dataLimiteStr = dataLimite.toISOString().split('T')[0]
+      
+      let offset = 0
+      const limit = 100
+      let totalProcessado = 0
+      let comValor = 0
+      
+      // Buscar DIRETAMENTE os fieldValues (mais rápido!)
+      console.log(`  🔍 Buscando todos os valores do campo ${customFieldId}...`)
+      
+      while (true) {
+        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}`
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Api-Token': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`ActiveCampaign API error: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const contacts = data.contacts || []
+        
+        if (contacts.length === 0) break
+        
+        allContacts = allContacts.concat(contacts)
+        
+        const total = parseInt(data.meta?.total || '0', 10)
+        
+        if (offset === 0) {
+          console.log(`  � Total de contatos: ${total}`)
+        }
+        
+        // Se carregamos todos, parar
+        if (allContacts.length >= total) break
+        
+        offset += limit
+        
+        // Log a cada 500
+        if (offset % 500 === 0) {
+          console.log(`  📦 Carregados ${allContacts.length}/${total} contatos...`)
+        }
+      }
+      
+      console.log(`✅ Total carregado: ${allContacts.length} contatos`)
+      
+      // Agora buscar os field values para cada contato
+      console.log(`📊 Buscando valores do campo customizado...`)
+      
+      const byDay: Record<string, number> = {}
+      const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      let comCampo = 0
+      let semCampo = 0
+      let dentroDoIntervalo = 0
+      
+      for (const contact of allContacts) {
+        try {
+          // Buscar field values do contato
+          const fieldUrl = `${this.baseUrl}/api/3/contacts/${contact.id}/fieldValues`
+          const fieldResponse = await fetch(fieldUrl, {
+            method: 'GET',
+            headers: {
+              'Api-Token': this.apiKey,
+              'Content-Type': 'application/json',
+            },
+          })
+          
+          if (fieldResponse.ok) {
+            const fieldData = await fieldResponse.json()
+            const fieldValues = fieldData.fieldValues || []
+            
+            // Procurar pelo campo customizado (por ID ou nome que contenha "BNY2" ou "Data do Cadastro")
+            const cadastroField = fieldValues.find((fv: any) => 
+              fv.field === customFieldId || 
+              fv.value?.includes('17/10/2025') || // Exemplo da imagem
+              (fieldData.fields && fieldData.fields.find((f: any) => 
+                (f.title?.includes('BNY2') || f.title?.includes('Data do Cadastro')) && f.id === fv.field
+              ))
+            )
+            
+            if (cadastroField && cadastroField.value) {
+              comCampo++
+              // Valor pode estar em vários formatos: "17/10/2025", "2025-10-17", ISO string, etc
+              let dataValue = cadastroField.value
+              
+              // Tentar parsear a data
+              let dataCadastro: Date | null = null
+              
+              // Formato DD/MM/YYYY
+              if (dataValue.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                const [dia, mes, ano] = dataValue.split('/')
+                dataCadastro = new Date(`${ano}-${mes}-${dia}`)
+              } 
+              // Formato ISO ou YYYY-MM-DD
+              else {
+                dataCadastro = new Date(dataValue)
+              }
+              
+              if (dataCadastro && !isNaN(dataCadastro.getTime())) {
+                // Verificar se está dentro do intervalo
+                if (dataCadastro >= dataLimite) {
+                  dentroDoIntervalo++
+                  const dia = dataCadastro.toISOString().split('T')[0]
+                  byDay[dia] = (byDay[dia] || 0) + 1
+                }
+              }
+            } else {
+              semCampo++
+            }
+          }
+        } catch (err) {
+          // Ignorar erros individuais
+        }
+      }
+      
+      console.log(`✅ Campo customizado processado:`)
+      console.log(`   - ${comCampo} contatos COM data de cadastro`)
+      console.log(`   - ${semCampo} contatos SEM data de cadastro`)
+      console.log(`   - ${dentroDoIntervalo} contatos nos últimos ${days} dias`)
+      console.log(`   - ${Object.keys(byDay).length} dias únicos com cadastros`)
+      
+      return {
+        total: dentroDoIntervalo,
+        byDay
+      }
+    } catch (error: any) {
+      console.error('Error fetching contacts with custom field:', error)
+      return { total: 0, byDay: {} }
+    }
+  }
+
+  /**
+   * Busca contatos criados nos últimos N dias (com paginação) - MÉTODO LEGADO
+   * @deprecated Use getContactsByTagAndCustomDate para dados mais precisos
+   */
+  async getRecentContactsByTag(tagId: number, days: number = 30): Promise<{ total: number; byDay: Record<string, number> }> {
+    // Agora delega para o método que usa campo customizado
+    return this.getContactsByTagAndCustomDate(tagId, days)
+  }
+}
+
+export const activeCampaignClient = new ActiveCampaignClient()

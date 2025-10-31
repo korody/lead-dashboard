@@ -10,15 +10,18 @@ import { InteractiveLineChart } from "../components/charts/interactive-line-char
 import { InteractivePieChart } from "../components/charts/interactive-pie-chart";
 import { InteractiveHorizontalBarChart } from "../components/charts/interactive-horizontal-bar-chart";
 import { ConversionFunnel } from "../components/charts/conversion-funnel";
-import UrgencyMatrix from "../components/ui/urgency-matrix";
+import UrgencyMatrixFull from "../components/ui/urgency-matrix-full";
+import { DateRangeFilter, DateRangeOption } from "../components/ui/date-range-filter";
+import { TemporalComparison } from "../components/ui/temporal-comparison";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   TrendingUp, Users, Target, Send, AlertTriangle, Activity, BarChart3, 
   Download, FileText, Moon, Sun, Zap, ZapOff, RefreshCw, Filter,
-  Bell, Settings, Eye
+  Bell, Settings, Eye, ChevronDown, ClipboardCheck
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import toast from "react-hot-toast";
+import { useState } from "react";
 
 type PriorityItem = { priority: string; count: number };
 type ElementoItem = { elemento: string; count: number };
@@ -40,32 +43,13 @@ type Metrics = {
 };
 
 export default function DashboardPage() {
-  const { data: metrics, isLoading, isError, error, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics();
+  const [selectedDays, setSelectedDays] = useState<DateRangeOption>(30)
+  const [showComparison, setShowComparison] = useState(false)
+  const { data: metrics, isLoading, isError, error, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays);
   const { theme, setTheme } = useTheme();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4"
-          />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Carregando Dashboard...
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400">
-            Sincronizando dados em tempo real
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
+  // Removido o loading global - agora cada seção carrega individualmente
+  // Isso permite que o dashboard apareça rapidamente e as seções carreguem progressivamente
 
   if (isError) {
     return (
@@ -132,6 +116,11 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center space-x-3">
+              <DateRangeFilter
+                selected={selectedDays}
+                onChange={setSelectedDays}
+              />
+
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -185,75 +174,159 @@ export default function DashboardPage() {
           <AnimatedStatCard
             title="Total de Leads"
             value={metrics?.totalLeads || 0}
-            previousValue={metrics?.totalLeads ? metrics.totalLeads - 100 : undefined}
+            previousValue={metrics?.comparison?.totalLeads}
             icon={Users}
             color="#6366f1"
             gradient="bg-gradient-to-br from-indigo-500 to-indigo-600"
-            subtitle="Desde 01 Mai 2024"
+            subtitle="Total geral (ActiveCampaign)"
             format="number"
             delay={0}
           />
 
           <AnimatedStatCard
-            title="Leads VIP"
-            value={metrics?.hotVips || 0}
-            previousValue={metrics?.hotVips ? metrics.hotVips - 5 : undefined}
-            icon={Target}
+            title="Diagnósticos Finalizados"
+            value={metrics?.totalDiagnosticos || 0}
+            previousValue={metrics?.comparison?.totalDiagnosticos}
+            icon={ClipboardCheck}
             color="#8b5cf6"
             gradient="bg-gradient-to-br from-purple-500 to-purple-600"
-            subtitle="Score alto conversão"
+            subtitle={`Quiz completado (${selectedDays}d)`}
             format="number"
             delay={0.1}
           />
 
           <AnimatedStatCard
-            title="Média Lead Score"
-            value={metrics?.avgScore || 0}
-            previousValue={metrics?.avgScore ? metrics.avgScore - 0.5 : undefined}
-            icon={TrendingUp}
+            title="Leads VIP"
+            value={metrics?.hotVips || 0}
+            previousValue={metrics?.comparison?.hotVips}
+            icon={Target}
             color="#06b6d4"
             gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
-            subtitle="Qualidade dos leads"
+            subtitle={`Score alto (${selectedDays}d)`}
             format="number"
             delay={0.2}
           />
 
-          <AnimatedStatCard
-            title="Conversão Geral do Funil"
-            value={metrics?.funil?.conversoes?.conversao_geral ? parseFloat(metrics.funil.conversoes.conversao_geral) : 0}
-            previousValue={metrics?.funil?.conversoes?.conversao_geral ? parseFloat(metrics.funil.conversoes.conversao_geral) - 2.5 : undefined}
-            icon={BarChart3}
-            color="#10b981"
-            gradient="bg-gradient-to-br from-green-500 to-emerald-600"
-            subtitle="Cadastro → Grupos WhatsApp"
-            format="percentage"
-            delay={0.3}
-          />
+          {selectedDays === 30 && (
+            <AnimatedStatCard
+              title="Conversão Geral"
+              value={metrics?.whatsappSuccess || 0}
+              previousValue={metrics?.whatsappSuccess ? metrics.whatsappSuccess - 2.5 : undefined}
+              icon={BarChart3}
+              color="#10b981"
+              gradient="bg-gradient-to-br from-green-500 to-emerald-600"
+              subtitle="Total geral (SendFlow)"
+              format="percentage"
+              delay={0.3}
+            />
+          )}
         </div>
 
-        {/* Funil de Conversão Completo */}
-        {metrics?.funil && (
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.5 }}
-          >
-            <Card className="shadow-2xl border-4 border-indigo-500 dark:border-indigo-400 bg-gray-50/50 dark:bg-gray-900/50">
-              <CardHeader>
-                <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                  <Target className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
-                  🎯 Funil de Conversão Completo
-                </CardTitle>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Do cadastro até a entrada nos grupos WhatsApp
-                </p>
+        {/* Comparação Temporal - Collapsible */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.45 }}
+        >
+          <Card className="shadow-xl border-2 border-indigo-200 dark:border-indigo-700 hover:border-indigo-400 dark:hover:border-indigo-500 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg overflow-hidden transition-all">
+            <CardHeader 
+              className="cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all"
+              onClick={() => setShowComparison(!showComparison)}
+            >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                      📊 Comparação vs Período Anterior
+                    </CardTitle>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Variação em relação aos {selectedDays} dias anteriores
+                    </p>
+                  </div>
+                  <motion.div
+                    animate={{ rotate: showComparison ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                  </motion.div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <ConversionFunnel data={metrics.funil} />
-              </CardContent>
+              <AnimatePresence>
+                {showComparison && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <CardContent>
+                      {isLoading || !metrics?.comparison ? (
+                        <div className="flex items-center justify-center py-8">
+                          <RefreshCw className="h-6 w-6 text-indigo-500 animate-spin mr-2" />
+                          <span className="text-gray-500 dark:text-gray-400">Calculando comparação...</span>
+                        </div>
+                      ) : (
+                        <div className={`grid grid-cols-1 ${selectedDays === 30 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+                          <TemporalComparison
+                            currentValue={metrics.totalDiagnosticos}
+                            previousValue={metrics.comparison.totalDiagnosticos}
+                            label="Diagnósticos Finalizados"
+                            format="number"
+                          />
+                          <TemporalComparison
+                            currentValue={metrics.hotVips}
+                            previousValue={metrics.comparison.hotVips}
+                            label="Leads VIP"
+                            format="number"
+                          />
+                          {selectedDays === 30 && (
+                            <TemporalComparison
+                              currentValue={metrics.whatsappSuccess || 0}
+                              previousValue={metrics.comparison.whatsappSuccess || 0}
+                              label="Taxa de Sucesso WhatsApp"
+                              format="percentage"
+                            />
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
           </motion.div>
-        )}
+
+        {/* Funil de Conversão Completo */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+        >
+          <Card className="shadow-2xl border-4 border-indigo-500 dark:border-indigo-400 bg-gray-50/50 dark:bg-gray-900/50">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <Target className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
+                🎯 Funil de Conversão
+              </CardTitle>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedDays === 30 
+                  ? `Cadastros (${selectedDays}d) → Diagnósticos (${selectedDays}d) → Grupos WhatsApp (total geral)`
+                  : `Cadastros (${selectedDays}d) → Diagnósticos (${selectedDays}d)`
+                }
+              </p>
+            </CardHeader>
+            <CardContent>
+              {isLoading || !metrics?.funil ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <ConversionFunnel data={metrics.funil} hideWhatsApp={selectedDays !== 30} />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
   
 
@@ -265,12 +338,37 @@ export default function DashboardPage() {
         >
           <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
             <CardContent className="p-6">
-              <InteractiveLineChart
-                data={metrics?.evolucaoTemporal}
-                title="📈 Evolução Temporal"
-                color="#8b5cf6"
-                gradient={true}
-              />
+              {isLoading || !metrics?.evolucaoTemporal ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="h-6 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-5 w-5 text-indigo-500 animate-spin" />
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Carregando dados do ActiveCampaign...
+                      </span>
+                    </div>
+                  </div>
+                  <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center">
+                    <div className="text-center space-y-3">
+                      <div className="mx-auto h-12 w-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Processando evolução temporal...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <InteractiveLineChart
+                  data={metrics.evolucaoTemporal}
+                  title={`📈 Evolução Temporal - ${selectedDays} dias`}
+                  color="#8b5cf6"
+                  gradient={true}
+                />
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -286,11 +384,24 @@ export default function DashboardPage() {
           >
             <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
               <CardContent className="p-6">
-                <InteractiveHorizontalBarChart
-                  title="📱 Status no Funil"
-                  subtitle="Distribuição completa de todos os status"
+                {isLoading || !metrics?.whatsappDistribution ? (
+                  <div className="space-y-4">
+                    <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="h-8 flex-1 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${100 - i * 15}%` }} />
+                          <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <InteractiveHorizontalBarChart
+                    title="📱 Status no Funil"
+                    subtitle="Distribuição completa de todos os status"
                     data={
-                    metrics?.whatsappDistribution?.map((item) => {
+                    metrics.whatsappDistribution?.map((item) => {
                       // Mapear status para nomes legíveis e cores.
                       // Normalizamos a chave aqui para bater com o que o backend retorna.
                       const normalize = (s: string) =>
@@ -328,8 +439,9 @@ export default function DashboardPage() {
                         color: mapped.color
                       }
                     }) || []}
-                  totalLeads={metrics?.totalLeads}
-                />
+                    totalLeads={metrics?.totalLeads}
+                  />
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -351,11 +463,23 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-600 dark:text-gray-400">Distribuição de leads por quadrante (Q1..Q4)</p>
             </CardHeader>
             <CardContent>
-              <UrgencyMatrix
-                quadrants={metrics?.quadrants || []}
-                storedCount={metrics?.storedDiagnosticsCount || 0}
-                total={metrics?.funil?.etapas?.diagnostico_completo || metrics?.totalLeads || 0}
-              />
+              {isLoading ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 justify-center py-4">
+                    <RefreshCw className="h-5 w-5 text-indigo-500 animate-spin" />
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      Carregando matriz de urgência...
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {[...Array(4)].map((_, i) => (
+                      <div key={i} className="h-32 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <UrgencyMatrixFull refreshKey={selectedDays} />
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -380,7 +504,14 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {isLoading || !metrics?.priorities ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="h-32 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
                   { label: 'Alta', value: metrics?.priorities?.find((p: any) => p.priority === 'ALTA')?.count || 0, color: 'from-red-500 to-red-600', textColor: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20' },
                   { label: 'Média', value: metrics?.priorities?.find((p: any) => p.priority === 'MEDIA')?.count || 0, color: 'from-orange-500 to-orange-600', textColor: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-900/20' },
@@ -411,6 +542,7 @@ export default function DashboardPage() {
                   </motion.div>
                 ))}
               </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -428,7 +560,18 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Distribuição por elemento dominante</p>
               </div>
               
-              <div className="space-y-4">
+              {isLoading || !metrics?.elementos ? (
+                <div className="space-y-3">
+                  {[...Array(5)].map((_, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+                      <div className="flex-1 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                      <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
                 {Object.entries(ELEMENTOS_MTC).map(([key, elem], index) => {
                   const count = metrics?.elementos?.find((e: any) => e.elemento === key)?.count || 0;
                   const maxCount = Math.max(...(metrics?.elementos?.map((e: any) => e.count) || [1]));
@@ -481,6 +624,7 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

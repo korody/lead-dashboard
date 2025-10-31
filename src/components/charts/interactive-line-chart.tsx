@@ -3,6 +3,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 interface InteractiveLineChartProps {
   data?: Array<{ data: string; leads: number }>
@@ -25,15 +26,16 @@ function LineChartCustomTooltip(props: unknown) {
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
-    })
+    }).replace(/^./, str => str.toUpperCase())
     const previous = first.payload?.previous as number | undefined
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border"
+        suppressHydrationWarning
       >
-        <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{dateFormatted}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-400" suppressHydrationWarning>{dateFormatted}</p>
         <p className="text-lg font-bold text-gray-900 dark:text-white">
           {value.toLocaleString ? value.toLocaleString('pt-BR') : String(value)} leads
         </p>
@@ -59,6 +61,12 @@ function LineChartCustomTooltip(props: unknown) {
 }
 
 export function InteractiveLineChart({ data, title, color = "#3b82f6", gradient = false }: InteractiveLineChartProps) {
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
   // Generate mock data similar to the image if no data provided
   const generateMockData = () => {
     const mockData = []
@@ -105,22 +113,38 @@ export function InteractiveLineChart({ data, title, color = "#3b82f6", gradient 
 
   const ChartComponent = gradient ? AreaChart : LineChart
 
+  if (!isMounted) {
+    return (
+      <div className="h-full">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="w-3 h-3 rounded-full animate-pulse" style={{ backgroundColor: color }}></div>
+            <span>Carregando...</span>
+          </div>
+        </div>
+        <div className="w-full h-[300px] bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse"></div>
+      </div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="h-full"
+      suppressHydrationWarning
     >
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+      <div className="mb-4" suppressHydrationWarning>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white" suppressHydrationWarning>{title}</h3>
+        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400" suppressHydrationWarning>
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
-          <span>Últimos 30 dias • {chartData.length} pontos • Total: {chartData.reduce((sum, item) => sum + item.leads, 0)} leads</span>
+          <span suppressHydrationWarning>Total: {chartData.reduce((sum, item) => sum + item.leads, 0).toLocaleString('pt-BR')} leads</span>
         </div>
       </div>
       
-      <div style={{ width: '100%', height: '300px' }}>
+      <div style={{ width: '100%', height: '300px' }} suppressHydrationWarning>
         <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={enrichedData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
           <defs>

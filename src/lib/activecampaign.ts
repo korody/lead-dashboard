@@ -113,7 +113,9 @@ export class ActiveCampaignClient {
   }
 
   /**
-   * Busca contatos criados nos últimos N dias
+   * Busca contatos nos últimos N dias
+   * USA UPDATED_DATE (udate) ao invés de created_date para melhor precisão
+   * udate é atualizado quando campos customizados são preenchidos
    */
   async getRecentContactsByTag(tagId: number, days: number = 30): Promise<{ total: number; byDay: Record<string, number> }> {
     if (!this.isConfigured()) {
@@ -121,35 +123,61 @@ export class ActiveCampaignClient {
     }
 
     try {
-      const dataInicio = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+      console.log(`📊 Buscando contatos com tag ${tagId} usando updated_date...`)
       
-      // ActiveCampaign usa filtros de data específicos
-      const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&created_after=${dataInicio}&limit=100`
+      // Buscar TODOS os contatos com a tag (sem filtro de data na API)
+      let allContacts: any[] = []
+      let offset = 0
+      const limit = 100
       
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Api-Token': this.apiKey,
-          'Content-Type': 'application/json',
-        },
-      })
+      while (true) {
+        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}`
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Api-Token': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        })
 
-      if (!response.ok) {
-        throw new Error(`ActiveCampaign API error: ${response.status}`)
+        if (!response.ok) break
+
+        const data = await response.json()
+        const contacts = data.contacts || []
+        
+        if (contacts.length === 0) break
+        
+        allContacts = allContacts.concat(contacts)
+        
+        const total = parseInt(data.meta?.total || '0', 10)
+        if (allContacts.length >= total) break
+        
+        offset += limit
       }
-
-      const data = await response.json()
-      const contacts = data.contacts || []
       
-      // Agrupar por dia
+      console.log(`✅ ${allContacts.length} contatos carregados`)
+      
+      // Filtrar e agrupar por udate (data de atualização)
+      const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
       const byDay: Record<string, number> = {}
-      contacts.forEach((contact: any) => {
-        const dia = new Date(contact.cdate).toISOString().split('T')[0]
-        byDay[dia] = (byDay[dia] || 0) + 1
+      let dentroIntervalo = 0
+      
+      allContacts.forEach((contact: any) => {
+        // Usar UDATE (updated date) ao invés de CDATE (created date)
+        const updateDate = new Date(contact.udate)
+        
+        if (updateDate >= dataLimite) {
+          const dia = updateDate.toISOString().split('T')[0]
+          byDay[dia] = (byDay[dia] || 0) + 1
+          dentroIntervalo++
+        }
       })
+      
+      console.log(`✅ ${dentroIntervalo} contatos atualizados nos últimos ${days} dias (via udate)`)
       
       return {
-        total: parseInt(data.meta?.total || '0', 10),
+        total: dentroIntervalo,
         byDay
       }
     } catch (error: any) {

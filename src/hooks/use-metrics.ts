@@ -6,7 +6,8 @@ import { useEffect } from 'react'
 import toast from 'react-hot-toast'
 
 export interface DashboardMetrics {
-  totalLeads: number
+  totalLeads: number // Total geral do ActiveCampaign
+  totalDiagnosticos: number // Total de diagnósticos do período (Supabase filtrado)
   hotVips: number
   avgScore: number
   whatsappSuccess: number
@@ -37,10 +38,18 @@ export interface DashboardMetrics {
   whatsappLogs: unknown
   vips24h: Array<unknown>
   resumo_diario: unknown
+  // Comparação temporal
+  comparison?: {
+    totalLeads: number
+    totalDiagnosticos: number
+    hotVips: number
+    conversaoGeral: number
+    whatsappSuccess: number
+  }
 }
 
-async function fetchMetrics(): Promise<DashboardMetrics> {
-  const response = await fetch('/api/metrics')
+async function fetchMetrics(days: number = 30): Promise<DashboardMetrics> {
+  const response = await fetch(`/api/metrics?days=${days}`)
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`)
   }
@@ -48,13 +57,13 @@ async function fetchMetrics(): Promise<DashboardMetrics> {
   return data.metrics
 }
 
-export function useMetrics() {
+export function useMetrics(days: number = 30) {
   const queryClient = useQueryClient()
   const { isRealTimeEnabled } = useDashboardStore()
 
   const query = useQuery({
-    queryKey: ['metrics'],
-    queryFn: fetchMetrics,
+    queryKey: ['metrics', days],
+    queryFn: () => fetchMetrics(days),
     staleTime: isRealTimeEnabled ? 30 * 1000 : 5 * 60 * 1000, // 30s if real-time, 5min otherwise
     refetchInterval: isRealTimeEnabled ? 60 * 1000 : false, // 1min if real-time enabled
     retry: 3,
@@ -65,7 +74,7 @@ export function useMetrics() {
   useEffect(() => {
     if (query.data && !query.isLoading && !query.isError) {
       // Detect significant changes
-      const previousData = queryClient.getQueryData(['metrics']) as DashboardMetrics
+      const previousData = queryClient.getQueryData(['metrics', days]) as DashboardMetrics | undefined
       if (previousData && query.data.totalLeads > previousData.totalLeads) {
         const newLeads = query.data.totalLeads - previousData.totalLeads
         toast.success(`🚀 ${newLeads} novo(s) cadastro(s) detectado(s)!`, {
@@ -82,7 +91,7 @@ export function useMetrics() {
         })
       }
     }
-  }, [query.data, queryClient])
+  }, [query.data, queryClient, days])
 
   // Show error toast
   useEffect(() => {
@@ -97,15 +106,15 @@ export function useMetrics() {
   return {
     ...query,
     refresh: () => {
-      queryClient.invalidateQueries({ queryKey: ['metrics'] })
+      queryClient.invalidateQueries({ queryKey: ['metrics', days] })
       toast.loading('Atualizando dados...', { duration: 2000 })
     }
   }
 }
 
-export function useRealTimeMetrics() {
+export function useRealTimeMetrics(days: number = 30) {
   const { isRealTimeEnabled, setRealTimeEnabled } = useDashboardStore()
-  const metricsQuery = useMetrics()
+  const metricsQuery = useMetrics(days)
 
   const toggleRealTime = () => {
     const newState = !isRealTimeEnabled

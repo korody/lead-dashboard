@@ -22,7 +22,7 @@ function normalizeToUiShape(payload: any) {
   const m = payload?.metricas || payload
   if (!m) return null
 
-  const totalLeads = m.totais_leads?.total ?? 0
+  // REMOVIDO: totalLeads do mock, não usado
   const hotVips = m.lead_score?.vips ?? 0
   const avgScore = m.lead_score?.media ?? 0
   const whatsappSuccess = m.sucesso_envios?.taxa_sucesso ?? 0
@@ -43,7 +43,7 @@ function normalizeToUiShape(payload: any) {
   }))
 
   return {
-    totalLeads,
+    totalLeads: 0, // Not used in this function
     hotVips,
     avgScore,
     whatsappSuccess,
@@ -76,111 +76,128 @@ function mockMetrics() {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Parse query parameters
+  const { searchParams } = new URL(request.url)
+  const requestedDays = parseInt(searchParams.get('days') || '30', 10)
+  const days = isNaN(requestedDays) ? 30 : requestedDays
+  
+  const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
+  // Log para depuração do ActiveCampaign
+  console.log('ActiveCampaign Tag ID:', acTagId)
+  console.log('Requested days:', days)
+  const acTest = await activeCampaignClient.getTotalContactsByTag(acTagId)
+  console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
   try {
     console.log('Starting metrics fetch...')
     
-    // Test basic connection first
-    const { count: totalLeads, error: countError } = await supabase
-      .from('quiz_leads')
-      .select('*', { count: 'exact', head: true })
-    
-    if (countError) {
-      console.error('Count error:', countError)
-      return NextResponse.json({
-        success: false,
-        error: `Database error: ${countError.message}`,
-        metrics: mockMetrics()
-      })
-    }
-    
-    console.log('Total leads found:', totalLeads)
-    
+
     // Buscar dados do ActiveCampaign e SendFlow em paralelo
     const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
+    console.log('ActiveCampaign Tag ID:', acTagId)
+    const acTest = await activeCampaignClient.getTotalContactsByTag(acTagId)
+    console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
     const sendFlowCampaignId = process.env.SENDFLOW_CAMPAIGN_ID || 'wg2d0SAmMwoRt0kBOVG'
-    
+
+    // Pega o total de leads do ActiveCampaign
     const acPromise = activeCampaignClient.getTotalContactsByTag(acTagId).catch(error => {
       console.error('ActiveCampaign fetch error:', error)
       return 0 // Fallback to 0 if error
     })
-    
+
     const sendFlowPromise = sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(error => {
       console.error('SendFlow fetch error:', error)
       return 0 // Fallback to 0 if error
     })
     
     // If we have no leads, return mock data with a note
-    if (!totalLeads || totalLeads === 0) {
-      console.log('No leads found, returning mock data')
-      return NextResponse.json({
-        success: true,
-        metrics: mockMetrics(),
-        note: 'No data found in database, showing mock data'
-      })
+    // ...existing code...
+    // Mover verificação para depois da atribuição
+    
+    let totalLeadsAC = 0;
+    let totalGruposWhatsApp = 0;
+    
+    // Buscar dados externos em paralelo
+    console.log('🔄 Fetching external APIs...')
+    const [ac, grupos] = await Promise.all([
+      acPromise,
+      sendFlowPromise
+    ])
+    totalLeadsAC = ac;
+    totalGruposWhatsApp = grupos;
+    console.log(`✅ ActiveCampaign total: ${totalLeadsAC}`)
+    console.log(`✅ SendFlow total: ${totalGruposWhatsApp}`)
+    
+    // Após verificação, atribuir valor de acTest se for válido (fallback)
+    if (acTest && typeof acTest === 'number' && acTest > 0 && totalLeadsAC === 0) {
+      totalLeadsAC = acTest;
     }
     
-    // Batch loading para pegar TODOS os leads sem limite de paginação
-    console.log('Starting batch loading for all leads...')
+    // Calcular data de corte baseada no período selecionado
+    const cutoffDate = new Date()
+    cutoffDate.setDate(cutoffDate.getDate() - days)
+    const cutoffIso = cutoffDate.toISOString()
+    
+    console.log(`🔍 Filtrando leads desde ${cutoffIso} (últimos ${days} dias)`)
+    
+    // Buscar count total primeiro (filtrado por período)
+    const { count: totalCount, error: countError } = await supabase
+      .from('quiz_leads')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', cutoffIso)
+    
+    console.log(`📊 Total de leads no Supabase nos últimos ${days} dias: ${totalCount}`)
+    
+    // Buscar TODOS os leads do Supabase sem limite
+    console.log('🔄 Loading leads from Supabase (filtered by period)...')
+    
+    // Buscar em batches para não ter limite, filtrando por data
     let allLeads: any[] = []
     let start = 0
     const batchSize = 1000
     
     while (true) {
-      const { data: batch, error: batchError } = await supabase
+      const { data, error } = await supabase
         .from('quiz_leads')
-        // include diagnostic fields if present in the table
-        .select('lead_score, whatsapp_status, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, intensidade_calculada, urgencia_calculada, quadrante')
+        .select('lead_score, whatsapp_status, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, quadrante')
+        .gte('created_at', cutoffIso)
         .order('id', { ascending: true })
         .range(start, start + batchSize - 1)
       
-      if (batchError) {
-        console.error('Batch loading error:', batchError)
-        break
+      if (error) {
+        console.error('❌ Error loading leads batch:', error)
+        throw new Error(`Failed to load leads: ${error.message}`)
       }
       
-      if (!batch || batch.length === 0) break
+      if (!data || data.length === 0) break
       
-      allLeads = allLeads.concat(batch)
-      console.log(`Loaded batch: ${batch.length} leads (total so far: ${allLeads.length})`)
+      allLeads = allLeads.concat(data)
+      console.log(`📦 Loaded batch: ${data.length} leads (total so far: ${allLeads.length})`)
       
-      if (batch.length < batchSize) break
+      // Se retornou menos que o batch size, chegamos ao fim
+      if (data.length < batchSize) break
       
       start += batchSize
     }
     
-    console.log(`✅ Batch loading complete: ${allLeads.length} total leads`)
-
-    // If batch loading returned no rows but the initial HEAD count indicated rows,
-    // it's often due to column-level restrictions or schema mismatch. In that case
-    // re-run a minimal select to recover essential fields for distributions.
-    if ((allLeads.length === 0) && (typeof totalLeads === 'number' && totalLeads > 0)) {
-      try {
-        console.log('Batch returned 0 rows but HEAD count > 0 — retrying minimal select...')
-        const { data: minimalData, error: minimalError } = await supabase
-          .from('quiz_leads')
-          .select('id, created_at, lead_score, is_hot_lead_vip, prioridade, elemento_principal, status_tags, whatsapp_status')
-          .order('id', { ascending: true })
-          .range(0, 9999)
-
-        if (!minimalError && minimalData && minimalData.length > 0) {
-          allLeads = minimalData
-          console.log(`Recovered ${allLeads.length} leads from minimal select`)
-        } else {
-          console.warn('Minimal select failed or returned no rows', minimalError)
-        }
-      } catch (e) {
-        console.error('Error during minimal select fallback:', e)
-      }
+    // Erro já tratado no loop acima
+    
+    console.error(`✅✅✅ LOADED ${allLeads?.length || 0} LEADS FROM SUPABASE ✅✅✅`)
+    
+    // Se não conseguiu carregar leads, retornar erro
+    if (!allLeads || allLeads.length === 0) {
+      console.error('⚠️ No leads found in Supabase')
+      // Continue mesmo sem leads para não quebrar o dashboard
     }
     
-    // Fetch dados adicionais para dashboard completo
+    // Fetch dados adicionais para dashboard completo (filtrado por período)
     const [
       { data: logsData, error: logsError }
     ] = await Promise.all([
       supabase
         .from('whatsapp_logs')
         .select('status, created_at')
+        .gte('created_at', cutoffIso)
         .range(0, 9999)
     ])
 
@@ -195,7 +212,7 @@ export async function GET() {
     const statusTagCount: Record<string, number> = {}
     allLeads.forEach(l => {
       // suportar diferentes nomes e formatos
-      const raw = l.status_tags ?? l.status_Tags ?? l.statusTags ?? l.whatsapp_status ?? ''
+      const raw = l.status_tags ?? l.whatsapp_status ?? ''
 
       let tags: string[] = []
       if (Array.isArray(raw)) {
@@ -219,10 +236,13 @@ export async function GET() {
       })
     })
 
-    const whatsappDistribution = Object.entries(statusTagCount).map(([status, count]) => {
-      const percentage = allLeads.length > 0 ? (count / allLeads.length * 100) : 0
-      return { status, count, percentage }
-    }).sort((a, b) => b.count - a.count)
+    const whatsappDistribution = Object.entries(statusTagCount)
+      .filter(([status]) => status !== 'TEMPLATE_ENVIADO') // Ignorar template_enviado
+      .map(([status, count]) => {
+        const percentage = allLeads.length > 0 ? (count / allLeads.length * 100) : 0
+        return { status, count, percentage }
+      })
+      .sort((a, b) => b.count - a.count)
 
     // manter métrica de sucesso baseada em whatsapp_status original (se aplicável)
     const whatsappSent = allLeads.filter(l => 
@@ -253,8 +273,7 @@ export async function GET() {
     const elemCount: Record<string, number> = {}
     allLeads.forEach(l => {
       if (l.elemento_principal) {
-        const e = l.elemento_principal
-        elemCount[e] = (elemCount[e] || 0) + 1
+        elemCount[l.elemento_principal] = (elemCount[l.elemento_principal] || 0) + 1
       }
     })
     const elementos = Object.entries(elemCount).map(([elemento, count]) => ({ elemento, count }))
@@ -264,17 +283,38 @@ export async function GET() {
       .filter(l => l.is_hot_lead_vip === true && new Date(l.created_at) >= new Date(Date.now()-24*60*60*1000))
       .slice(0, 10)
 
-    // Calcular evolução temporal dos leads (últimos 30 dias)
+    // Calcular evolução temporal dos leads
+    // PRIORIDADE: Usar dados do ActiveCampaign se configurado, senão usar Supabase
     async function calcularEvolucaoTemporal() {
-      console.log('Calculando evolução temporal...')
+      const numDays = days
       
-      const numDays = 30
+      // Tentar buscar do ActiveCampaign primeiro (usando updated_date)
+      if (activeCampaignClient.isConfigured()) {
+        try {
+          console.log('📊 Buscando evolução temporal do ActiveCampaign (via updated_date)...')
+          const { byDay } = await activeCampaignClient.getRecentContactsByTag(acTagId, numDays)
+          
+          // Preencher todos os dias (mesmo com 0)
+          const resultado = []
+          for(let i=numDays-1;i>=0;i--){ 
+            const d = new Date(Date.now()-i*24*60*60*1000) 
+            const dia = d.toISOString().split('T')[0] 
+            resultado.push({ data: dia, leads: byDay[dia]||0 }) 
+          }
+          
+          console.log(`✅ Evolução temporal do ActiveCampaign: ${Object.keys(byDay).length} dias com dados`)
+          return resultado
+        } catch (error) {
+          console.error('❌ Erro ao buscar do ActiveCampaign, usando Supabase como fallback:', error)
+        }
+      }
       
+      // Fallback: Buscar do Supabase
+      console.log('📊 Buscando evolução temporal do Supabase...')
       let allData: any[] = []
       let start = 0
       const batchSize = 1000
       
-      // Fazer requisições em batch até pegar todos os dados
       while (true) {
         const { data, error } = await supabase
           .from('quiz_leads')
@@ -291,38 +331,86 @@ export async function GET() {
         
         allData = allData.concat(data)
         
-        // Se retornou menos que o batch size, chegamos ao fim
         if (data.length < batchSize) break
         
         start += batchSize
       }
       
-      const porDia: Record<string, number> = {};
+      const porDia: Record<string, number> = {}
       allData.forEach(l => { 
-        const dia = new Date(l.created_at).toISOString().split('T')[0]; 
-        porDia[dia] = (porDia[dia]||0)+1; 
-      });
+        const dia = new Date(l.created_at).toISOString().split('T')[0] 
+        porDia[dia] = (porDia[dia]||0)+1 
+      })
       
-      const resultado = [];
+      const resultado = []
       for(let i=numDays-1;i>=0;i--){ 
-        const d = new Date(Date.now()-i*24*60*60*1000); 
-        const dia = d.toISOString().split('T')[0]; 
-        resultado.push({ data: dia, leads: porDia[dia]||0 }); 
+        const d = new Date(Date.now()-i*24*60*60*1000) 
+        const dia = d.toISOString().split('T')[0] 
+        resultado.push({ data: dia, leads: porDia[dia]||0 }) 
       }
       
-      console.log(`Evolução temporal gerada para 30 dias:`, resultado.slice(0, 5));
-      console.log(`Total de registros do período:`, allData.length);
-      console.log('Dias com dados:', Object.keys(porDia).length);
-      
-      return resultado;
+      console.log(`✅ Evolução temporal do Supabase: ${Object.keys(porDia).length} dias com dados`)
+      return resultado
     }
     
+    // Função para calcular comparação com período anterior
+    async function calcularComparacaoPeriodo(days: number, currentLeads: any[], totalAC: number, gruposWA: number) {
+      const now = Date.now()
+      const periodStart = now - (days * 24 * 60 * 60 * 1000)
+      const previousPeriodEnd = periodStart
+      const previousPeriodStart = periodStart - (days * 24 * 60 * 60 * 1000)
+      
+      // Datas ISO para query
+      const prevStartIso = new Date(previousPeriodStart).toISOString()
+      const prevEndIso = new Date(previousPeriodEnd).toISOString()
+      
+      console.log(`📊 Buscando período anterior: ${prevStartIso} até ${prevEndIso}`)
+      
+      // Buscar leads do período anterior do banco
+      const { data: previousLeads, count: previousCount } = await supabase
+        .from('quiz_leads')
+        .select('is_hot_lead_vip, whatsapp_status, created_at', { count: 'exact' })
+        .gte('created_at', prevStartIso)
+        .lt('created_at', prevEndIso)
+      
+      const previousTotal = previousCount || 0
+      const previousVips = previousLeads?.filter(l => l.is_hot_lead_vip === true).length || 0
+      
+      // Calcular whatsappSuccess do período anterior
+      const previousWhatsappSent = previousLeads?.filter(l => 
+        l.whatsapp_status === 'sent' || 
+        l.whatsapp_status === 'resultados_enviados' ||
+        l.whatsapp_status === 'desafio_enviado'
+      ).length || 0
+      const previousWhatsappSuccess = previousTotal > 0 
+        ? (previousWhatsappSent / previousTotal) * 100 
+        : 0
+      
+      // VIPs do período atual
+      const currentVips = currentLeads.filter(l => l.is_hot_lead_vip === true).length
+      
+      // Conversão anterior (estimativa baseada em proporção)
+      const conversaoAnterior = previousTotal > 0 
+        ? (previousVips / previousTotal) * 100 
+        : 0
+      
+      console.log(`✅ Comparação: Anterior ${previousTotal} leads (${previousVips} VIPs, ${previousWhatsappSuccess.toFixed(1)}% WA) vs Atual ${currentLeads.length} leads (${currentVips} VIPs)`)
+      
+      return {
+        totalLeads: totalAC, // Total AC não muda (é sempre total geral)
+        totalDiagnosticos: previousTotal, // Total de diagnósticos do período anterior
+        hotVips: previousVips,
+        conversaoGeral: parseFloat(conversaoAnterior.toFixed(1)),
+        whatsappSuccess: parseFloat(previousWhatsappSuccess.toFixed(1))
+      }
+    }
+
     const evolucaoTemporal = await calcularEvolucaoTemporal()
 
     
 
     // === Quadrantes (Matriz Urgência x Intensidade)
-    // Prefer DB-stored `quadrante`, otherwise derive from intensidade_calculada/urgencia_calculada, otherwise fallback to priority+lead_score
+    // Prefer DB-stored `quadrante`, otherwise fallback to priority+lead_score
     const intensityThreshold = parseFloat(process.env.QUADRANT_INTENSITY_THRESHOLD || '70')
     const quadranteCounts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 }
 
@@ -333,20 +421,6 @@ export async function GET() {
       if (l.quadrante != null) {
         const qv = typeof l.quadrante === 'number' ? l.quadrante : (typeof l.quadrante === 'string' && l.quadrante !== '' ? Number(l.quadrante) : NaN)
         if (!isNaN(qv) && [1,2,3,4].includes(qv)) q = qv
-      }
-
-      // Priority 2: intensity/urgency stored explicitly (scale 1-5)
-      if (q === null && (l.intensidade_calculada != null || l.urgencia_calculada != null)) {
-        const intensidade = typeof l.intensidade_calculada === 'number' ? l.intensidade_calculada : (typeof l.intensidade_calculada === 'string' && l.intensidade_calculada !== '' ? Number(l.intensidade_calculada) : NaN)
-        const urgencia = typeof l.urgencia_calculada === 'number' ? l.urgencia_calculada : (typeof l.urgencia_calculada === 'string' && l.urgencia_calculada !== '' ? Number(l.urgencia_calculada) : NaN)
-        const validInt = !isNaN(intensidade)
-        const validUrg = !isNaN(urgencia)
-        if (validInt && validUrg) {
-          if (intensidade >= 4 && urgencia >= 4) q = 1
-          else if (intensidade >= 4 && urgencia <= 3) q = 2
-          else if (intensidade <= 3 && urgencia >= 4) q = 3
-          else q = 4
-        }
       }
 
       // Fallback: derive from prioridade + lead_score
@@ -380,35 +454,40 @@ export async function GET() {
       }
     }).sort((a, b) => a.id - b.id)
 
-  const storedDiagnosticsCount = allLeads.filter(l => l.intensidade_calculada != null && l.urgencia_calculada != null).length || 0
+  // Conta os leads que tem quadrante definido (diagnosticos armazenados)
+  const storedDiagnosticsCount = allLeads.filter(l => l.quadrante != null).length || 0
 
     // Buscar dados externos em paralelo
-    const [totalInscritosPDV, totalGruposWhatsApp] = await Promise.all([
-      acPromise,
-      sendFlowPromise
-    ])
+
+    // O total de leads deve vir do ActiveCampaign (tag específica)
+  // totalLeadsAC já definido acima
     
     console.log('External integrations:', {
-      activeCampaign: totalInscritosPDV,
+      activeCampaign: totalLeadsAC,
       sendFlow: totalGruposWhatsApp
     })
     
     // Funil de conversão completo e detalhado (3 etapas)
+    if (!totalLeadsAC || totalLeadsAC === 0) {
+      console.log('No leads found, returning mock data')
+      return NextResponse.json({
+        success: true,
+        metrics: mockMetrics(),
+        note: 'No data found in database, showing mock data'
+      })
+    }
+  // Total de diagnósticos finalizados (leads no Supabase do período filtrado)
   const total_quiz_completado = allLeads?.length || 0
-
-  // If batch loading returned empty but the initial HEAD count query found rows,
-  // fall back to that `totalLeads` value so dashboard denominators aren't zero.
-  const effectiveDiagnostico = total_quiz_completado || (typeof totalLeads === 'number' ? totalLeads : 0)
-
-  // Etapa 1: Cadastro → Diagnóstico Completo (use effectiveDiagnostico as the canonical value)
-  const diagnostico_completo = effectiveDiagnostico
-    
-    // Etapa 2: Diagnóstico → Grupos WhatsApp (dados do SendFlow)
-    const grupos_whatsapp = totalGruposWhatsApp
-    
-  // TODAS as conversões devem usar o total de diagnósticos/quiz completados
-  // (ou o contar HEAD inicial, se o batch falhar) como denominador estável.
-  const base_total = diagnostico_completo || (typeof totalLeads === 'number' ? totalLeads : 0)
+  const diagnostico_completo = total_quiz_completado
+  
+  // IMPORTANTE: Total de cadastros SEMPRE vem do ActiveCampaign (total geral)
+  const total_cadastros = totalLeadsAC || 0
+  
+  // Etapa 2: Diagnóstico → Grupos WhatsApp (dados do SendFlow - total geral)
+  const grupos_whatsapp = totalGruposWhatsApp
+  
+  // Base para conversões: usar cadastros AC para conversão de diagnósticos
+  const base_total = total_cadastros
     
     const conv_pdv_diagnostico = base_total > 0
       ? Math.min(100, (diagnostico_completo / base_total) * 100).toFixed(1)
@@ -431,9 +510,8 @@ export async function GET() {
         quiz_completado: total_quiz_completado,
         diagnostico_completo: diagnostico_completo,
         grupos_whatsapp: grupos_whatsapp,
-        // Use DB-based completions as the canonical "cadastros" baseline so
-        // absolute numbers remain consistent across the dashboard.
-        cadastros_pdc: diagnostico_completo,
+        // Total de cadastros do ActiveCampaign
+        cadastros_pdc: total_cadastros,
       },
       
       // Taxas de conversão entre etapas
@@ -489,9 +567,14 @@ export async function GET() {
       taxa_sucesso_envios: parseFloat(taxa_sucesso_envios.toString())
     }
 
+    // Calcular comparação com período anterior (mesma duração)
+    const comparison = await calcularComparacaoPeriodo(days, allLeads, totalLeadsAC, grupos_whatsapp)
+
     const metrics = {
-      // Use effectiveDiagnostico (batch length or head count) as totalLeads so dashboard numbers reflect DB data
-      totalLeads: effectiveDiagnostico || 0,
+      // IMPORTANTE: Total de leads SEMPRE vem do ActiveCampaign (total geral)
+      totalLeads: totalLeadsAC || 0,
+      // Total de diagnósticos finalizados no período (Supabase filtrado)
+      totalDiagnosticos: allLeads.length,
       hotVips,
       avgScore: parseFloat(avgScore.toFixed(1)),
       whatsappSuccess: parseFloat(whatsappSuccess.toFixed(1)),
@@ -501,21 +584,28 @@ export async function GET() {
       elementos,
       evolucaoTemporal,
       funil,
-  quadrants,
-  storedDiagnosticsCount,
+      quadrants,
+      storedDiagnosticsCount,
       whatsappLogs,
       vips24h,
-      resumo_diario
+      resumo_diario,
+      comparison
     }
 
-    return NextResponse.json({ success: true, metrics })
+    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
+
+    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
+
+    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
+
+  return NextResponse.json({ success: true, metrics })
   } catch (err: any) {
-    console.error('Erro ao buscar métricas:', err)
+    console.error('ERRO 500 MÉTRICAS:', err && err.stack ? err.stack : err);
     // Fallback to mock
-    const fallback = mockMetrics()
+    const fallback = mockMetrics();
     return NextResponse.json(
-      { success: true, metrics: fallback, note: 'fallback:error', error: err?.message },
-      { status: 200 }
-    )
+      { success: false, metrics: fallback, note: 'fallback:error', error: err?.message },
+      { status: 500 }
+    );
   }
 }
