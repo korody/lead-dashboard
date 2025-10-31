@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 import { Calendar, ChevronDown } from "lucide-react"
 import { useState } from "react"
 
-export type DateRangeOption = 3 | 7 | 15 | 30
+export type DateRangeOption = 3 | 7 | 15 | 30 | 9999
 
 interface DateRangeFilterProps {
   selected: DateRangeOption
@@ -16,10 +16,11 @@ const OPTIONS: { value: DateRangeOption; label: string }[] = [
   { value: 7, label: "Últimos 7 dias" },
   { value: 15, label: "Últimos 15 dias" },
   { value: 30, label: "Últimos 30 dias" },
+  { value: 9999, label: "Todo o Tempo" },
 ]
 
 export function DateRangeFilter({ selected, onChange }: DateRangeFilterProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(true)
   
   const selectedOption = OPTIONS.find(o => o.value === selected) || OPTIONS[1]
 

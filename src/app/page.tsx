@@ -43,7 +43,7 @@ type Metrics = {
 };
 
 export default function DashboardPage() {
-  const [selectedDays, setSelectedDays] = useState<DateRangeOption>(30)
+  const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const [showComparison, setShowComparison] = useState(false)
   const [currentTime, setCurrentTime] = useState<string>("")
 
@@ -328,12 +328,6 @@ export default function DashboardPage() {
                 <Target className="h-7 w-7 text-indigo-600 dark:text-indigo-400" />
                 🎯 Funil de Conversão
               </CardTitle>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedDays === 30 
-                  ? `Cadastros (${selectedDays}d) → Diagnósticos (${selectedDays}d) → Grupos WhatsApp (total geral)`
-                  : `Cadastros (${selectedDays}d) → Diagnósticos (${selectedDays}d)`
-                }
-              </p>
             </CardHeader>
             <CardContent>
               {isLoading || !metrics?.funil ? (
