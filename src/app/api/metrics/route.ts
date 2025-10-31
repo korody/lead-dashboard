@@ -134,35 +134,50 @@ export async function GET(request: Request) {
     }
     
     // Calcular data de corte baseada no período selecionado
+    const isTodoTempo = days >= 9999
     const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - days)
+    if (!isTodoTempo) {
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+    } else {
+      cutoffDate.setFullYear(2000) // Data bem antiga para pegar tudo
+    }
     const cutoffIso = cutoffDate.toISOString()
     
-    console.log(`🔍 Filtrando leads desde ${cutoffIso} (últimos ${days} dias)`)
+    console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`})`)
     
-    // Buscar count total primeiro (filtrado por período)
-    const { count: totalCount, error: countError } = await supabase
+    // Buscar count total primeiro (filtrado por período ou tudo)
+    let countQuery = supabase
       .from('quiz_leads')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', cutoffIso)
     
-    console.log(`📊 Total de leads no Supabase nos últimos ${days} dias: ${totalCount}`)
+    if (!isTodoTempo) {
+      countQuery = countQuery.gte('created_at', cutoffIso)
+    }
+    
+    const { count: totalCount, error: countError } = await countQuery
+    
+    console.log(`📊 Total de leads no Supabase: ${totalCount}`)
     
     // Buscar TODOS os leads do Supabase sem limite
-    console.log('🔄 Loading leads from Supabase (filtered by period)...')
+    console.log('🔄 Loading leads from Supabase...')
     
-    // Buscar em batches para não ter limite, filtrando por data
+    // Buscar em batches para não ter limite
     let allLeads: any[] = []
     let start = 0
     const batchSize = 1000
     
     while (true) {
-      const { data, error } = await supabase
+      let query = supabase
         .from('quiz_leads')
         .select('lead_score, whatsapp_status, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, quadrante')
-        .gte('created_at', cutoffIso)
         .order('id', { ascending: true })
         .range(start, start + batchSize - 1)
+      
+      if (!isTodoTempo) {
+        query = query.gte('created_at', cutoffIso)
+      }
+      
+      const { data, error } = await query
       
       if (error) {
         console.error('❌ Error loading leads batch:', error)
@@ -190,15 +205,20 @@ export async function GET(request: Request) {
       // Continue mesmo sem leads para não quebrar o dashboard
     }
     
-    // Fetch dados adicionais para dashboard completo (filtrado por período)
+    // Fetch dados adicionais para dashboard completo
+    let logsQuery = supabase
+      .from('whatsapp_logs')
+      .select('status, created_at')
+      .range(0, 9999)
+    
+    if (!isTodoTempo) {
+      logsQuery = logsQuery.gte('created_at', cutoffIso)
+    }
+    
     const [
       { data: logsData, error: logsError }
     ] = await Promise.all([
-      supabase
-        .from('whatsapp_logs')
-        .select('status, created_at')
-        .gte('created_at', cutoffIso)
-        .range(0, 9999)
+      logsQuery
     ])
 
     // Calcular métricas principais usando allLeads
@@ -286,7 +306,7 @@ export async function GET(request: Request) {
     // Calcular evolução temporal dos leads
     // PRIORIDADE: Usar dados do ActiveCampaign se configurado, senão usar Supabase
     async function calcularEvolucaoTemporal() {
-      const numDays = days
+      const numDays = days >= 9999 ? 365 : days // Limitar "Todo o Tempo" a 1 ano de visualização
       
       // Tentar buscar do ActiveCampaign primeiro (usando updated_date)
       if (activeCampaignClient.isConfigured()) {
@@ -355,6 +375,17 @@ export async function GET(request: Request) {
     
     // Função para calcular comparação com período anterior
     async function calcularComparacaoPeriodo(days: number, currentLeads: any[], totalAC: number, gruposWA: number) {
+      // Se for "Todo o Tempo" (9999), não faz comparação
+      if (days >= 9999) {
+        return {
+          totalLeads: totalAC,
+          totalDiagnosticos: 0,
+          hotVips: 0,
+          conversaoGeral: 0,
+          whatsappSuccess: 0
+        }
+      }
+      
       const now = Date.now()
       const periodStart = now - (days * 24 * 60 * 60 * 1000)
       const previousPeriodEnd = periodStart
