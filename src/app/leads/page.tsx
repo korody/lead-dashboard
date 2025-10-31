@@ -34,6 +34,7 @@ export default function LeadsPage() {
   const searchParams = useSearchParams()
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
+  const [isMounted, setIsMounted] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filtroElemento, setFiltroElemento] = useState<string>(searchParams?.get('elemento') || 'TODOS')
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>(searchParams?.get('prioridade') || 'TODOS')
@@ -44,6 +45,7 @@ export default function LeadsPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   useEffect(() => {
+    setIsMounted(true)
     carregarLeads()
   }, [])
 
@@ -131,7 +133,7 @@ export default function LeadsPage() {
   }
 
   const getIconeElemento = (elemento: string) => {
-    return ELEMENTOS_MTC[elemento as keyof typeof ELEMENTOS_MTC]?.icone || '⚪'
+    return ELEMENTOS_MTC[elemento as keyof typeof ELEMENTOS_MTC]?.emoji || '⚪'
   }
 
   const getCorElemento = (elemento: string) => {
@@ -171,7 +173,7 @@ export default function LeadsPage() {
     return sortDirection === 'desc' ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />
   }
 
-  if (loading) {
+  if (!isMounted || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 flex items-center justify-center">
         <motion.div
@@ -196,8 +198,8 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 p-4 md:p-8" suppressHydrationWarning>
+      <div className="max-w-7xl mx-auto" suppressHydrationWarning>
         
         {/* Header com navegação */}
         <motion.div
@@ -293,7 +295,7 @@ export default function LeadsPage() {
                       <option value="TODOS">Todos os Elementos</option>
                       {Object.entries(ELEMENTOS_MTC).map(([key, elem]) => (
                         <option key={key} value={key}>
-                          {elem.icone} {elem.nome}
+                          {elem.emoji} {elem.nome}
                         </option>
                       ))}
                     </select>
