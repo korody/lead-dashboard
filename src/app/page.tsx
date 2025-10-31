@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type PriorityItem = { priority: string; count: number };
 type ElementoItem = { elemento: string; count: number };
@@ -45,6 +45,15 @@ type Metrics = {
 export default function DashboardPage() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(30)
   const [showComparison, setShowComparison] = useState(false)
+  const [currentTime, setCurrentTime] = useState<string>("")
+
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleTimeString('pt-BR'))
+    const interval = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('pt-BR'))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
   const { data: metrics, isLoading, isError, error, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays);
   const { theme, setTheme } = useTheme();
 
@@ -661,9 +670,9 @@ export default function DashboardPage() {
               transition={{ duration: 2, repeat: Infinity }}
               className={`w-2 h-2 rounded-full ${isRealTimeEnabled ? 'bg-green-500' : 'bg-gray-400'}`}
             />
-            <span className="text-sm">
+            <span className="text-sm" suppressHydrationWarning>
               {isRealTimeEnabled ? 'Dados atualizando em tempo real' : 'Modo manual ativo'} • 
-              Última atualização: {new Date().toLocaleTimeString('pt-BR')}
+              Última atualização: {currentTime || '...'}
             </span>
           </div>
         </motion.div>
