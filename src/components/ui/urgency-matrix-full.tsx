@@ -71,7 +71,9 @@ export default function UrgencyMatrixFull({ refreshKey }: UrgencyMatrixFullProps
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1, duration: 0.3 }}
               whileHover={{ scale: 1.02, y: -2 }}
-              className="p-4 rounded-xl shadow-md dark:shadow-none bg-white/70 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 cursor-pointer transition-all"
+              onClick={() => window.location.href = `/leads?quadrante=${quadrante}`}
+              className="p-4 rounded-xl shadow-md dark:shadow-none bg-white/70 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 cursor-pointer transition-all hover:shadow-lg hover:border-indigo-300 dark:hover:border-indigo-600"
+              title={`Clique para ver os ${count} leads do ${info.title}`}
             >
               <div className="flex items-start justify-between">
                 <div>

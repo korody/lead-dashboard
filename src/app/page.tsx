@@ -138,6 +138,16 @@ export default function DashboardPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                onClick={() => window.location.href = '/leads'}
+                className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-all"
+              >
+                <Users className="h-4 w-4" />
+                <span>Ver Leads</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={refresh}
                 className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-all"
               >
@@ -195,17 +205,19 @@ export default function DashboardPage() {
             delay={0.1}
           />
 
-          <AnimatedStatCard
-            title="Leads VIP"
-            value={metrics?.hotVips || 0}
-            previousValue={metrics?.comparison?.hotVips}
-            icon={Target}
-            color="#06b6d4"
-            gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
-            subtitle={`Score alto (${selectedDays}d)`}
-            format="number"
-            delay={0.2}
-          />
+          <div onClick={() => window.location.href = '/leads?vip=true'} className="cursor-pointer">
+            <AnimatedStatCard
+              title="Leads VIP"
+              value={metrics?.hotVips || 0}
+              previousValue={metrics?.comparison?.hotVips}
+              icon={Target}
+              color="#06b6d4"
+              gradient="bg-gradient-to-br from-cyan-500 to-blue-600"
+              subtitle={`Score alto (${selectedDays}d) • Clique para ver`}
+              format="number"
+              delay={0.2}
+            />
+          </div>
 
           {selectedDays === 30 && (
             <AnimatedStatCard
@@ -523,7 +535,9 @@ export default function DashboardPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.8 + index * 0.1, duration: 0.4 }}
                     whileHover={{ scale: 1.05, y: -5 }}
-                    className={`${item.bgColor} p-6 rounded-2xl text-center cursor-pointer transition-all duration-300 hover:shadow-lg`}
+                    onClick={() => window.location.href = `/leads?prioridade=${item.label.toUpperCase()}`}
+                    className={`${item.bgColor} p-6 rounded-2xl text-center cursor-pointer transition-all duration-300 hover:shadow-lg hover:ring-2 hover:ring-offset-2 hover:ring-indigo-500`}
+                    title={`Clique para ver os ${item.value} leads de prioridade ${item.label}`}
                   >
                     <div className={`text-sm font-medium mb-3 ${item.textColor} dark:text-white`}>
                       {item.label}
@@ -583,7 +597,9 @@ export default function DashboardPage() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.6 + index * 0.1, duration: 0.3 }}
-                      className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-3 rounded-lg transition-all cursor-pointer"
+                      onClick={() => window.location.href = `/leads?elemento=${key}`}
+                      className="group hover:bg-gray-50 dark:hover:bg-gray-700/50 p-3 rounded-lg transition-all cursor-pointer hover:ring-2 hover:ring-indigo-300 dark:hover:ring-indigo-600"
+                      title={`Clique para ver os ${count} leads do elemento ${elem.nome}`}
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">
