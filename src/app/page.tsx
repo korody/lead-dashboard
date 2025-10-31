@@ -228,7 +228,7 @@ export default function DashboardPage() {
             />
           </div>
 
-          {selectedDays === 30 && (
+          {(selectedDays === 30 || selectedDays >= 9999) && (
             <AnimatedStatCard
               title="Conversão Geral"
               value={metrics?.whatsappSuccess || 0}
@@ -286,7 +286,7 @@ export default function DashboardPage() {
                           <span className="text-gray-500 dark:text-gray-400">Calculando comparação...</span>
                         </div>
                       ) : (
-                        <div className={`grid grid-cols-1 ${selectedDays === 30 ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
+                        <div className={`grid grid-cols-1 ${(selectedDays === 30 || selectedDays >= 9999) ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
                           <TemporalComparison
                             currentValue={metrics.totalDiagnosticos}
                             previousValue={metrics.comparison.totalDiagnosticos}
@@ -299,7 +299,7 @@ export default function DashboardPage() {
                             label="Leads VIP"
                             format="number"
                           />
-                          {selectedDays === 30 && (
+                          {(selectedDays === 30 || selectedDays >= 9999) && (
                             <TemporalComparison
                               currentValue={metrics.whatsappSuccess || 0}
                               previousValue={metrics.comparison.whatsappSuccess || 0}
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <ConversionFunnel data={metrics.funil} hideWhatsApp={selectedDays !== 30} />
+                <ConversionFunnel data={metrics.funil} hideWhatsApp={selectedDays !== 30 && selectedDays < 9999} />
               )}
             </CardContent>
           </Card>
