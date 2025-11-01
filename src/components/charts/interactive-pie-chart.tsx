@@ -160,8 +160,14 @@ function PieCustomTooltip(props: unknown) {
   return null
 }
 
-function PieCustomLabel(props: { cx: number; cy: number; midAngle: number; innerRadius: number; outerRadius: number; percent: number }) {
-  const { cx, cy, midAngle, innerRadius, outerRadius, percent } = props
+function PieCustomLabel(props: Record<string, unknown>) {
+  const cx = typeof props.cx === 'number' ? props.cx : 0
+  const cy = typeof props.cy === 'number' ? props.cy : 0
+  const midAngle = typeof props.midAngle === 'number' ? props.midAngle : 0
+  const innerRadius = typeof props.innerRadius === 'number' ? props.innerRadius : 0
+  const outerRadius = typeof props.outerRadius === 'number' ? props.outerRadius : 0
+  const percent = typeof props.percent === 'number' ? props.percent : 0
+  
   if (percent < 0.05) return null // Don't show label for slices < 5%
   const RADIAN = Math.PI / 180
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5
