@@ -293,28 +293,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                 </div>
               )}
 
-              {/* Perfil MTC - Compacto */}
-              <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/30 rounded-2xl p-4 shadow-xl">
-                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-purple-400" />
-                  Perfil MTC
-                </h3>
-                <div className="flex items-center gap-4 bg-gray-800/60 rounded-xl p-3 border border-gray-700/50">
-                  <div 
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ring-2 ring-white/10 shrink-0"
-                    style={{ backgroundColor: getCorElemento(lead.elemento_principal) }}
-                  >
-                    {getIconeElemento(lead.elemento_principal)}
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-400">Elemento Principal</div>
-                    <div className="font-semibold text-white">
-                      {getNomeElemento(lead.elemento_principal)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Perfil de Marketing */}
               {lead.respostas && (lead.respostas.P11 || lead.respostas.P12 || lead.respostas.P13) && (
                 <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/30 rounded-2xl p-5 shadow-xl">
@@ -369,6 +347,28 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   </div>
                 </div>
               )}
+
+              {/* Perfil MTC - Compacto */}
+              <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-2 border-purple-500/30 rounded-2xl p-4 shadow-xl">
+                <h3 className="text-base font-bold text-white mb-3 flex items-center gap-2">
+                  <Target className="w-4 h-4 text-purple-400" />
+                  Perfil MTC
+                </h3>
+                <div className="flex items-center gap-4 bg-gray-800/60 rounded-xl p-3 border border-gray-700/50">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-lg ring-2 ring-white/10 shrink-0"
+                    style={{ backgroundColor: getCorElemento(lead.elemento_principal) }}
+                  >
+                    {getIconeElemento(lead.elemento_principal)}
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-400">Elemento Principal</div>
+                    <div className="font-semibold text-white">
+                      {getNomeElemento(lead.elemento_principal)}
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Diagnóstico Completo */}
               {lead.diagnostico_completo && (
