@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Phone, Mail, Target, Flame, MessageCircle, Award, Clock, Tag } from "lucide-react"
 import { Badge } from "./badge"
@@ -32,8 +33,12 @@ interface LeadDetailModalProps {
 export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps) {
   if (!lead) return null
 
-  // Calcular dias no sistema (fora do render para evitar impure function)
-  const diasNoSistema = Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
+  // Calcular dias no sistema usando useMemo para evitar impure function error
+  const diasNoSistema = useMemo(() => {
+    const now = new Date().getTime()
+    const createdAt = new Date(lead.created_at).getTime()
+    return Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
+  }, [lead.created_at])
 
   // Gerar referral link baseado no lead (mesmo padrão do backend)
   const generateReferralLink = () => {
