@@ -19,46 +19,55 @@ interface InteractiveBarChartProps {
   showPercentage?: boolean
 }
 
-// Module-level tooltip and label to avoid creating components during render
-function BarCustomTooltip(props: unknown) {
-  if (typeof props !== 'object' || props === null) return null
-  const p = props as { active?: boolean; payload?: unknown[]; displayedTotal?: number }
-  const { active, payload, displayedTotal } = p
-  if (active && Array.isArray(payload) && payload.length) {
-    const first = payload[0] as { payload?: Record<string, unknown> }
-    const data = first.payload || {}
-    const name = typeof data.name === 'string' ? data.name : ''
-    const value = typeof data.value === 'number' ? data.value : (typeof data.value === 'string' ? Number(data.value) : 0)
-    const percentage = typeof data.percentage === 'number' ? data.percentage : undefined
-    const percent = typeof percentage === 'number' ? percentage : (displayedTotal && displayedTotal > 0 ? (value / displayedTotal * 100) : 0)
+// Module-level tooltip - Create wrapper function to pass displayedTotal correctly
+function createBarCustomTooltip(displayedTotal: number) {
+  return function BarCustomTooltip(props: unknown) {
+    if (typeof props !== 'object' || props === null) return null
+    const p = props as { active?: boolean; payload?: unknown[] }
+    const { active, payload } = p
+    if (active && Array.isArray(payload) && payload.length) {
+      const first = payload[0] as { payload?: Record<string, unknown> }
+      const data = first.payload || {}
+      const name = typeof data.name === 'string' ? data.name : ''
+      const value = typeof data.value === 'number' ? data.value : (typeof data.value === 'string' ? Number(data.value) : 0)
+      const percentage = typeof data.percentage === 'number' ? data.percentage : undefined
+      const percent = typeof percentage === 'number' ? percentage : (displayedTotal && displayedTotal > 0 ? (value / displayedTotal * 100) : 0)
 
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <div 
-            className="w-3 h-3 rounded-full" 
-            style={{ backgroundColor: typeof data.color === 'string' ? data.color : '#000' }}
-          ></div>
-          <p className="font-medium text-gray-900 dark:text-white">{name}</p>
-        </div>
-        <p className="text-2xl font-bold text-gray-900 dark:text-white">
-          {value.toLocaleString ? value.toLocaleString('pt-BR') : String(value)}
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          {percent.toFixed(1)}% do total
-        </p>
-      </motion.div>
-    )
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: typeof data.color === 'string' ? data.color : '#000' }}
+            ></div>
+            <p className="font-medium text-gray-900 dark:text-white">{name}</p>
+          </div>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
+            {value.toLocaleString ? value.toLocaleString('pt-BR') : String(value)}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {percent.toFixed(1)}% do total
+          </p>
+        </motion.div>
+      )
+    }
+    return null
   }
-  return null
 }
 
-function BarCustomLabel(props: { x: number; y: number; width: number; value: number; index: number; data: BarData[]; displayedTotal: number; showPercentage: boolean }) {
-  const { x, y, width, index, data, displayedTotal, showPercentage } = props
+function BarCustomLabel(props: Record<string, unknown> & { data: BarData[]; displayedTotal: number; showPercentage: boolean }) {
+  const x = typeof props.x === 'number' ? props.x : 0
+  const y = typeof props.y === 'number' ? props.y : 0
+  const width = typeof props.width === 'number' ? props.width : 0
+  const index = typeof props.index === 'number' ? props.index : 0
+  const { data, displayedTotal, showPercentage } = props
+  
+  if (!data || !data[index]) return null
+  
   const item = data[index]
   const percent = typeof item.percentage === 'number'
     ? item.percentage
@@ -88,8 +97,7 @@ export function InteractiveBarChart({
 }: InteractiveBarChartProps) {
   const sumValues = data.reduce((sum, item) => sum + item.value, 0)
   const displayedTotal = typeof totalLeads === 'number' ? totalLeads : sumValues
-
-  
+  const BarTooltip = createBarCustomTooltip(displayedTotal)
 
   return (
     <motion.div
@@ -140,12 +148,12 @@ export function InteractiveBarChart({
               width={70}
             />
             
-            <Tooltip content={<BarCustomTooltip displayedTotal={displayedTotal} />} cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }} />
+            <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }} />
             
             <Bar 
               dataKey="value" 
               radius={[8, 8, 0, 0]}
-              label={<BarCustomLabel data={data} displayedTotal={displayedTotal} showPercentage={showPercentage} />}
+              label={(props) => <BarCustomLabel {...props} data={data} displayedTotal={displayedTotal} showPercentage={showPercentage} />}
             >
               {data.map((entry, index) => (
                 <Cell 
