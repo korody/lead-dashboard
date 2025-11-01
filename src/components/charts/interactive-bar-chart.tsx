@@ -3,7 +3,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { useMemo } from 'react'
 
 interface BarData {
   name: string
@@ -98,7 +97,6 @@ export function InteractiveBarChart({
 }: InteractiveBarChartProps) {
   const sumValues = data.reduce((sum, item) => sum + item.value, 0)
   const displayedTotal = typeof totalLeads === 'number' ? totalLeads : sumValues
-  const BarTooltip = useMemo(() => createBarCustomTooltip(displayedTotal), [displayedTotal])
 
   return (
     <motion.div
@@ -149,7 +147,10 @@ export function InteractiveBarChart({
               width={70}
             />
             
-            <Tooltip content={<BarTooltip />} cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }} />
+            <Tooltip content={(props) => {
+              const BarTooltip = createBarCustomTooltip(displayedTotal)
+              return BarTooltip(props)
+            }} cursor={{ fill: 'rgba(99, 102, 241, 0.1)' }} />
             
             <Bar 
               dataKey="value" 
