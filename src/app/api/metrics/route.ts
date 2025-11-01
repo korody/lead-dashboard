@@ -4,56 +4,6 @@ import { QUADRANTES } from '@/lib/constants'
 import { activeCampaignClient } from '@/lib/activecampaign'
 import { sendFlowClient } from '@/lib/sendflow'
 
-// Helper to fetch with timeout
-async function fetchWithTimeout(url: string, opts: RequestInit & { timeoutMs?: number } = {}) {
-  const { timeoutMs = 4000, ...init } = opts
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal })
-    return res
-  } finally {
-    clearTimeout(id)
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normalizeToUiShape(payload: any) {
-  // Accept either { success, metricas } or already-normalized
-  const m = payload?.metricas || payload
-  if (!m) return null
-
-  // REMOVIDO: totalLeads do mock, não usado
-  const hotVips = m.lead_score?.vips ?? 0
-  const avgScore = m.lead_score?.media ?? 0
-  const whatsappSuccess = m.sucesso_envios?.taxa_sucesso ?? 0
-  const withWhatsapp = m.funil?.diagnostico_enviado ?? 0
-
-  const prioridades = m.distribuicao_prioridade || {}
-  const priorities = [
-    { priority: 'ALTA', count: prioridades.alta ?? 0 },
-    { priority: 'MEDIA', count: prioridades.media ?? 0 },
-    { priority: 'BAIXA', count: prioridades.baixa ?? 0 },
-    { priority: 'SEM', count: prioridades.sem_prioridade ?? 0 },
-  ]
-
-  const elementosObj = m.distribuicao_elemento_mtc || {}
-  const elementos = Object.entries(elementosObj).map(([elemento, v]: [string, unknown]) => ({
-    elemento,
-    count: typeof v === 'object' && v ? ((v as { count?: number }).count ?? 0) : (typeof v === 'number' ? v : 0)
-  }))
-
-  return {
-    totalLeads: 0, // Not used in this function
-    hotVips,
-    avgScore,
-    whatsappSuccess,
-    withWhatsapp,
-    priorities,
-    elementos,
-  }
-}
-
 function mockMetrics() {
   return {
     totalLeads: 0,
@@ -82,13 +32,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const requestedDays = parseInt(searchParams.get('days') || '30', 10)
   const days = isNaN(requestedDays) ? 30 : requestedDays
-  
-  const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
-  // Log para depuração do ActiveCampaign
-  console.log('ActiveCampaign Tag ID:', acTagId)
-  console.log('Requested days:', days)
-  const acTest = await activeCampaignClient.getTotalContactsByTag(acTagId)
-  console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
   try {
     console.log('Starting metrics fetch...')
     
@@ -158,7 +101,7 @@ export async function GET(request: Request) {
       countQuery = countQuery.gte('created_at', cutoffIso)
     }
     
-    const { count: totalCount, error: countError } = await countQuery
+  const { count: totalCount } = await countQuery
     
     console.log(`📊 Total de leads no Supabase: ${totalCount}`)
     
@@ -220,7 +163,7 @@ export async function GET(request: Request) {
     }
     
     const [
-      { data: logsData, error: logsError }
+      { data: logsData }
     ] = await Promise.all([
       logsQuery
     ])
@@ -425,7 +368,7 @@ export async function GET(request: Request) {
     }
     
     // Função para calcular comparação com período anterior
-    async function calcularComparacaoPeriodo(days: number, currentLeads: Array<Record<string, unknown>>, totalAC: number, gruposWA: number) {
+  async function calcularComparacaoPeriodo(days: number, currentLeads: Array<Record<string, unknown>>, totalAC: number, _gruposWA: number) {
       // Se for "Todo o Tempo" (9999), não faz comparação
       if (days >= 9999) {
         return {
@@ -674,11 +617,7 @@ export async function GET(request: Request) {
       comparison
     }
 
-    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
-
-    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
-
-    console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
+  console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
 
   return NextResponse.json({ success: true, metrics })
   } catch (err: unknown) {
