@@ -17,6 +17,7 @@ async function fetchWithTimeout(url: string, opts: RequestInit & { timeoutMs?: n
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeToUiShape(payload: any) {
   // Accept either { success, metricas } or already-normalized
   const m = payload?.metricas || payload
@@ -227,8 +228,8 @@ export async function GET(request: Request) {
     // Calcular métricas principais usando allLeads
     const vipLeads = allLeads.filter(l => l.is_hot_lead_vip === true)
     const hotVips = vipLeads.length
-    const scores = allLeads.filter(l => l.lead_score != null).map(l => l.lead_score) || []
-    const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+    const scores = allLeads.filter(l => l.lead_score != null).map(l => l.lead_score as number) || []
+    const avgScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0
 
     // Distribuição detalhada de status a partir do campo `status_tags`
     // Cada lead conta no máximo uma vez por tag (se tiver múltiplas tags, conta em cada uma)
@@ -295,7 +296,7 @@ export async function GET(request: Request) {
     // Elementos
     const elemCount: Record<string, number> = {}
     allLeads.forEach(l => {
-      if (l.elemento_principal) {
+      if (l.elemento_principal && typeof l.elemento_principal === 'string') {
         elemCount[l.elemento_principal] = (elemCount[l.elemento_principal] || 0) + 1
       }
     })
@@ -303,7 +304,7 @@ export async function GET(request: Request) {
     
     // VIPs recentes (últimas 24h)
     const vipsRecentes = allLeads
-      .filter(l => l.is_hot_lead_vip === true && new Date(l.created_at) >= new Date(Date.now()-24*60*60*1000))
+      .filter(l => l.is_hot_lead_vip === true && l.created_at && new Date(l.created_at as string) >= new Date(Date.now()-24*60*60*1000))
       .slice(0, 10)
 
     // Calcular evolução temporal dos leads
@@ -383,9 +384,11 @@ export async function GET(request: Request) {
       const porDia: Record<string, number> = {}
       allData.forEach(l => { 
         // Converter para timezone de São Paulo
-        const dataBrasil = new Date(new Date(l.created_at).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
-        const dia = dataBrasil.toISOString().split('T')[0] 
-        porDia[dia] = (porDia[dia]||0)+1 
+        if (l.created_at) {
+          const dataBrasil = new Date(new Date(l.created_at as string).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+          const dia = dataBrasil.toISOString().split('T')[0] 
+          porDia[dia] = (porDia[dia]||0)+1 
+        }
       })
       
       // Se for "Todo o Tempo", mostrar apenas a partir do primeiro lead
@@ -632,9 +635,9 @@ export async function GET(request: Request) {
 
     // Resumo diário
     const hoje = new Date(); hoje.setHours(0,0,0,0); const hoje_iso = hoje.toISOString()
-    const leads_hoje = allLeads?.filter(l => new Date(l.created_at) >= hoje) || []
+    const leads_hoje = allLeads?.filter(l => l.created_at && new Date(l.created_at as string) >= hoje) || []
     const vips_hoje = vipsRecentes?.length || 0
-    const envios_hoje = logsData?.filter(l => new Date(l.created_at) >= hoje) || []
+    const envios_hoje = logsData?.filter(l => l.created_at && new Date(l.created_at as string) >= hoje) || []
     const envios_sucesso = envios_hoje?.filter(l=>l.status==='sent' || l.status==='success').length || 0
     const taxa_sucesso_envios = envios_hoje.length>0 ? ((envios_sucesso/envios_hoje.length)*100).toFixed(1) : 0
     const resumo_diario = {
