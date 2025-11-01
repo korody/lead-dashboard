@@ -57,8 +57,12 @@ export function AnimatedStatCard({
         clearTimeout(visTimer)
       }
     } else {
-      setDisplayValue(numericValue)
-      return () => clearTimeout(visTimer)
+      // Also defer this setState to avoid cascading renders
+      const valueTimer = setTimeout(() => setDisplayValue(numericValue), 0)
+      return () => {
+        clearTimeout(visTimer)
+        clearTimeout(valueTimer)
+      }
     }
   }, [numericValue, format])
 
