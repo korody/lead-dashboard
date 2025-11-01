@@ -25,6 +25,7 @@ interface Lead {
   is_hot_lead_vip: boolean
   whatsapp_status?: string
   created_at: string
+  respostas?: Record<string, string>
 }
 
 type SortField = 'nome' | 'lead_score' | 'elemento_principal' | 'prioridade' | 'quadrante' | 'created_at'

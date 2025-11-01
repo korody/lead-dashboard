@@ -22,6 +22,7 @@ interface Lead {
   script_abertura?: string
   diagnostico_completo?: string
   referral_link?: string
+  respostas?: Record<string, string>
 }
 
 interface LeadDetailModalProps {
@@ -85,6 +86,37 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
   const formatStatusTags = (tags?: string[]) => {
     if (!tags || tags.length === 0) return []
     return tags.map(tag => tag.replace(/_/g, ' ').toUpperCase())
+  }
+
+  // Mapeamento das respostas de marketing
+  const getRendaMensal = (resposta?: string) => {
+    const mapeamento: Record<string, string> = {
+      'A': 'Até R$ 3.000',
+      'B': 'R$ 3.000 - R$ 7.000',
+      'C': 'R$ 7.000 - R$ 15.000',
+      'D': 'Acima de R$ 15.000',
+      'E': 'Prefiro não informar'
+    }
+    return resposta ? mapeamento[resposta] || 'Não informado' : 'Não informado'
+  }
+
+  const getStatusAluno = (resposta?: string) => {
+    const mapeamento: Record<string, string> = {
+      'A': 'Ainda não sou aluno(a)',
+      'B': 'Sim, sou ou já fui aluno(a)'
+    }
+    return resposta ? mapeamento[resposta] || 'Não informado' : 'Não informado'
+  }
+
+  const getTempoConhece = (resposta?: string) => {
+    const mapeamento: Record<string, string> = {
+      'A': 'Conheci agora através de amigos ou familiares',
+      'B': 'Conheci agora através de anúncios',
+      'C': 'Há pouco tempo (1-3 meses)',
+      'D': 'Há cerca de 6 meses',
+      'E': 'Há bastante tempo (mais de 1 ano)'
+    }
+    return resposta ? mapeamento[resposta] || 'Não informado' : 'Não informado'
   }
 
   return (
@@ -282,6 +314,61 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   </div>
                 </div>
               </div>
+
+              {/* Perfil de Marketing */}
+              {lead.respostas && (lead.respostas.P11 || lead.respostas.P12 || lead.respostas.P13) && (
+                <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border-2 border-blue-500/30 rounded-2xl p-5 shadow-xl">
+                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    Perfil de Marketing
+                  </h3>
+                  <div className="space-y-3">
+                    {/* Renda Mensal */}
+                    {lead.respostas.P11 && (
+                      <div className="flex items-start gap-3 p-4 bg-gray-800/60 rounded-xl border border-gray-700/50">
+                        <div className="text-2xl shrink-0">💰</div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-400 mb-1">Renda Mensal</div>
+                          <div className="font-semibold text-white">
+                            {getRendaMensal(lead.respostas.P11)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status Aluno */}
+                    {lead.respostas.P12 && (
+                      <div className="flex items-start gap-3 p-4 bg-gray-800/60 rounded-xl border border-gray-700/50">
+                        <div className="text-2xl shrink-0">🎓</div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-400 mb-1">Status</div>
+                          <div className="font-semibold text-white">
+                            {getStatusAluno(lead.respostas.P12)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tempo que Conhece */}
+                    {lead.respostas.P13 && (
+                      <div className="flex items-start gap-3 p-4 bg-gray-800/60 rounded-xl border border-gray-700/50">
+                        <div className="text-2xl shrink-0">📅</div>
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-400 mb-1">Conhece há</div>
+                          <div className="font-semibold text-white">
+                            {getTempoConhece(lead.respostas.P13)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 text-xs text-blue-400/80 text-center">
+                    📊 Informações coletadas no quiz de diagnóstico
+                  </div>
+                </div>
+              )}
 
               {/* Diagnóstico Completo */}
               {lead.diagnostico_completo && (
