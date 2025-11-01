@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
-  TrendingUp, 
   Target,
   RefreshCw
 } from 'lucide-react'
@@ -261,10 +260,11 @@ export default function HomePage() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {(() => {
                     const totalLeads = metrics?.totalDiagnosticos || 1;
+                    type PriorityItem = { priority: string; count: number }
                     return [
-                      { label: 'Alta', value: metrics?.priorities?.find((p: any) => p.priority === 'ALTA')?.count || 0, color: 'from-red-500 to-red-600', textColor: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20' },
-                      { label: 'Média', value: metrics?.priorities?.find((p: any) => p.priority === 'MEDIA')?.count || 0, color: 'from-orange-500 to-orange-600', textColor: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-900/20' },
-                      { label: 'Baixa', value: metrics?.priorities?.find((p: any) => p.priority === 'BAIXA')?.count || 0, color: 'from-green-500 to-green-600', textColor: 'text-green-600', bgColor: 'bg-green-50 dark:bg-green-900/20' }
+                      { label: 'Alta', value: metrics?.priorities?.find((p: PriorityItem) => p.priority === 'ALTA')?.count || 0, color: 'from-red-500 to-red-600', textColor: 'text-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20' },
+                      { label: 'Média', value: metrics?.priorities?.find((p: PriorityItem) => p.priority === 'MEDIA')?.count || 0, color: 'from-orange-500 to-orange-600', textColor: 'text-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-900/20' },
+                      { label: 'Baixa', value: metrics?.priorities?.find((p: PriorityItem) => p.priority === 'BAIXA')?.count || 0, color: 'from-green-500 to-green-600', textColor: 'text-green-600', bgColor: 'bg-green-50 dark:bg-green-900/20' }
                     ].map((item, index) => {
                       const percentage = ((item.value / totalLeads) * 100).toFixed(1);
                       return (

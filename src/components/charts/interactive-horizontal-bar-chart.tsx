@@ -18,10 +18,10 @@ interface InteractiveHorizontalBarChartProps {
 }
 
 // Tooltip component declared at module level to avoid creating components during render
-function HorizontalBarCustomTooltip(props: unknown) {
+type TooltipPropsGeneric = Record<string, unknown> & { displayedTotal?: number }
+function HorizontalBarCustomTooltip(props: TooltipPropsGeneric) {
   if (typeof props !== 'object' || props === null) return null
-  const p = props as { active?: boolean; payload?: unknown[]; displayedTotal?: number }
-  const { active, payload, displayedTotal } = p
+  const { active, payload, displayedTotal } = props as { active?: boolean; payload?: unknown[]; displayedTotal?: number }
   if (active && Array.isArray(payload) && payload.length) {
     const first = payload[0] as { payload?: Record<string, unknown> }
     const d = first.payload || {}
@@ -52,7 +52,9 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
   })
 
   // Custom tooltip wrapper that includes displayedTotal
-  const CustomTooltip = (props: any) => <HorizontalBarCustomTooltip {...props} displayedTotal={displayedTotal} />
+  const CustomTooltip = (props: Record<string, unknown>) => (
+    <HorizontalBarCustomTooltip {...props} displayedTotal={displayedTotal} />
+  )
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="h-full">
@@ -76,7 +78,14 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
                 <Cell key={`cell-${entry.name}-${i}`} fill={entry.color} />
               ))}
               {/* show percentage label at the end of each bar */}
-              <LabelList dataKey="percentage" position="right" formatter={(v: any) => typeof v === 'number' ? `${v.toFixed(1)}%` : ''} style={{ fill: '#ffffff', fontSize: 13 }} />
+              <LabelList
+                dataKey="percentage"
+                position="right"
+                formatter={(label: unknown) =>
+                  typeof label === 'number' ? `${label.toFixed(1)}%` : ''
+                }
+                style={{ fill: '#ffffff', fontSize: 13 }}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

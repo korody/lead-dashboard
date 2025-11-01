@@ -13,7 +13,7 @@ interface DashboardState {
   setRealTimeEnabled: (enabled: boolean) => void
   setTimeRange: (range: '24h' | '7d' | '30d' | '90d') => void
   setSelectedMetric: (metric: string) => void
-  setFilters: (filters: any) => void
+  setFilters: (filters: { element?: string; priority?: string; status?: string }) => void
   clearFilters: () => void
 }
 

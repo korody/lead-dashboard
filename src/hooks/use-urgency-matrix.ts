@@ -35,7 +35,7 @@ export function useUrgencyMatrix(refreshKey?: number) {
         // IMPORTANTE: A tabela é chamada 'quiz_leads' no Supabase, não 'leads'
         // Buscar TODOS os leads (mesma base que o funil usa)
         // A API já faz busca em batch de todos os leads, aqui fazemos o mesmo
-        let allLeads: any[] = []
+  let allLeads: Array<{ quadrante: number | null; elemento_principal?: string | null }> = []
         let start = 0
         const batchSize = 1000
         
@@ -121,7 +121,10 @@ export function useUrgencyMatrix(refreshKey?: number) {
         }
 
         leadsComDiagnostico.forEach(lead => {
-          quadrantCounts[lead.quadrante]++
+          const q = Number(lead.quadrante)
+          if (q >= 1 && q <= 4) {
+            quadrantCounts[q]++
+          }
         })
 
         const total = totalGeral // Usar total geral como base

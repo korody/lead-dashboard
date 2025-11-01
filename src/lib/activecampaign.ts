@@ -127,8 +127,8 @@ export class ActiveCampaignClient {
     try {
       console.log(`📊 Buscando contatos com tag ${tagId} usando updated_date...`)
       
-      // Buscar TODOS os contatos com a tag (sem filtro de data na API)
-      let allContacts: any[] = []
+  // Buscar TODOS os contatos com a tag (sem filtro de data na API)
+  let allContacts: Array<Record<string, unknown>> = []
       let offset = 0
       const limit = 100
       
@@ -166,9 +166,11 @@ export class ActiveCampaignClient {
       const byDay: Record<string, number> = {}
       let dentroIntervalo = 0
       
-      allContacts.forEach((contact: any) => {
+      allContacts.forEach((contact: Record<string, unknown>) => {
         // Usar UDATE (updated date) ao invés de CDATE (created date)
-        const updateDate = new Date(contact.udate)
+        const updateRaw = (contact as { udate?: string }).udate
+        if (!updateRaw) return
+        const updateDate = new Date(updateRaw)
         
         if (updateDate >= dataLimite) {
           // Converter para timezone brasileiro
