@@ -59,55 +59,56 @@ function LeadsPageContent() {
     buscarTotalSupabase()
   }, [])
 
-  // Debounced global search: when user types, query Supabase across ALL leads
+  // Watch for filter changes and trigger server-side search
   useEffect(() => {
-    const handler = setTimeout(() => {
-      const term = searchTerm.trim()
-      if (term === '') {
-        // if we were searching before, reload the paginated leads
-        if (isSearching) {
-          carregarLeads()
-          setIsSearching(false)
-        }
-        return
+    if (!isMounted) return
+    
+    const hasActiveFilters = filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP
+    
+    if (hasActiveFilters || searchTerm.trim() !== '') {
+      const handler = setTimeout(() => {
+        buscarComFiltros()
+      }, 300)
+      return () => clearTimeout(handler)
+    } else {
+      // No filters active, load paginated results
+      carregarLeads()
+    }
+  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, searchTerm, isMounted])
+
+  const buscarComFiltros = async () => {
+    try {
+      setLoadingSearch(true)
+      let query = supabase
+        .from('quiz_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      // Apply search term if exists
+      if (searchTerm.trim() !== '') {
+        const like = `%${searchTerm.trim()}%`
+        query = query.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
       }
 
-      // perform a global search across nome, email and celular
-      const buscarGlobal = async () => {
-        try {
-          setLoadingSearch(true)
-          const like = `%${term}%`
-          let query = supabase
-            .from('quiz_leads')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
+      // Apply filters
+      if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
+      if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
+      if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
+      if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
 
-          // Apply server-side filters when searching to reduce payload
-          if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
-          if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
-          if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
-          if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
-
-          // Limit to a reasonable max to avoid fetching tens of thousands at once
-          const { data, error } = await query.limit(2000)
-          if (error) throw error
-          setLeads(data || [])
-          setPaginaAtual(1)
-          setIsSearching(true)
-        } catch (err) {
-          console.error('Erro na busca global de leads:', err)
-        } finally {
-          setLoadingSearch(false)
-        }
-      }
-
-      buscarGlobal()
-    }, 300)
-
-    return () => clearTimeout(handler)
-  // include filters so search updates when user changes them while searching
-  }, [searchTerm, filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, isSearching])
+      // Limit to 2000 for performance
+      const { data, error } = await query.limit(2000)
+      if (error) throw error
+      
+      setLeads(data || [])
+      setPaginaAtual(1)
+      setIsSearching(true)
+    } catch (err) {
+      console.error('Erro ao buscar leads com filtros:', err)
+    } finally {
+      setLoadingSearch(false)
+    }
+  }
 
   const buscarTotalSupabase = async () => {
     try {
@@ -164,21 +165,8 @@ function LeadsPageContent() {
     }
   }
 
-  const leadsFiltrados = leads.filter(lead => {
-    const matchSearch = searchTerm === '' || 
-      lead.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.celular?.includes(searchTerm)
-    
-    const matchElemento = filtroElemento === 'TODOS' || lead.elemento_principal === filtroElemento
-    const matchPrioridade = filtroPrioridade === 'TODOS' || lead.prioridade === filtroPrioridade
-    const matchQuadrante = filtroQuadrante === 'TODOS' || lead.quadrante === parseInt(filtroQuadrante)
-    const matchVIP = !filtroVIP || lead.is_hot_lead_vip === true
-    
-    return matchSearch && matchElemento && matchPrioridade && matchQuadrante && matchVIP
-  })
-
-  const leadsOrdenados = [...leadsFiltrados].sort((a, b) => {
+  // Os leads já vêm filtrados do servidor, só precisamos ordenar
+  const leadsOrdenados = [...leads].sort((a, b) => {
     const mult = sortDirection === 'asc' ? 1 : -1
     const aVal = a[sortField]
     const bVal = b[sortField]
@@ -425,7 +413,11 @@ function LeadsPageContent() {
                 </div>
 
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {leadsOrdenados.length} de {totalLeads} leads
+                  {isSearching ? (
+                    <>{leadsOrdenados.length} leads encontrados</>
+                  ) : (
+                    <>{leadsOrdenados.length} de {totalLeads} leads</>
+                  )}
                 </div>
               </div>
 
