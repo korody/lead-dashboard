@@ -7,9 +7,8 @@ import { Badge } from "../../components/ui/badge"
 import { motion } from "framer-motion"
 import { 
   Search, Filter, Download, Flame, ChevronDown, ChevronUp, 
-  ArrowLeft, SortAsc, SortDesc, Users, Target, X
+  SortAsc, SortDesc, Users, Target, X
 } from "lucide-react"
-import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { ELEMENTOS_MTC } from '../../lib/constants'
 import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
@@ -77,7 +76,7 @@ export default function LeadsPage() {
         try {
           setLoadingSearch(true)
           const like = `%${term}%`
-          let query: any = supabase
+          let query = supabase
             .from('quiz_leads')
             .select('*')
             .order('created_at', { ascending: false })
@@ -107,7 +106,7 @@ export default function LeadsPage() {
 
     return () => clearTimeout(handler)
   // include filters so search updates when user changes them while searching
-  }, [searchTerm, filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP])
+  }, [searchTerm, filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, isSearching])
 
   const buscarTotalSupabase = async () => {
     try {
