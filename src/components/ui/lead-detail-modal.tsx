@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Phone, Mail, Calendar, Target, Flame, MessageCircle, Award, Clock, Tag } from "lucide-react"
+import { X, Phone, Mail, Target, Flame, MessageCircle, Award, Clock, Tag } from "lucide-react"
 import { Badge } from "./badge"
 import { ELEMENTOS_MTC } from "../../lib/constants"
 
@@ -31,6 +31,9 @@ interface LeadDetailModalProps {
 
 export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps) {
   if (!lead) return null
+
+  // Calcular dias no sistema (fora do render para evitar impure function)
+  const diasNoSistema = Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
 
   // Gerar referral link baseado no lead (mesmo padrão do backend)
   const generateReferralLink = () => {
@@ -71,16 +74,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
       4: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
     }
     return cores[quadrante as keyof typeof cores] || 'bg-gray-500/20 text-gray-300 border border-gray-500/40'
-  }
-
-  const formatWhatsAppStatus = (status?: string) => {
-    const statusMap: Record<string, string> = {
-      'AGUARDANDO_CONTATO': '⏳ Aguardando Contato',
-      'diagnostico_enviado': '✅ Diagnóstico Enviado',
-      'desafio_enviado': '🎯 Desafio Enviado',
-      'grupo_adicionado': '👥 No Grupo',
-    }
-    return status ? statusMap[status] || status.replace(/_/g, ' ') : 'Não Contatado'
   }
 
   const formatStatusTags = (tags?: string[]) => {
@@ -367,7 +360,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   <div className="flex justify-between items-center p-3 bg-gray-800/40 rounded-lg">
                     <span className="text-gray-400">Dias no Sistema:</span>
                     <span className="font-semibold">
-                      {Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))} dias
+                      {diasNoSistema} dias
                     </span>
                   </div>
                 </div>
