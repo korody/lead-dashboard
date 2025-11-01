@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
 import { Badge } from "../../components/ui/badge"
@@ -30,7 +30,7 @@ interface Lead {
 type SortField = 'nome' | 'lead_score' | 'elemento_principal' | 'prioridade' | 'quadrante' | 'created_at'
 type SortDirection = 'asc' | 'desc'
 
-export default function LeadsPage() {
+function LeadsPageContent() {
   const searchParams = useSearchParams()
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
@@ -689,5 +689,22 @@ export default function LeadsPage() {
           onClose={handleCloseModal}
         />
     </div>
+  )
+}
+
+export default function LeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-4 animate-spin" />
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Carregando Leads...
+          </h2>
+        </div>
+      </div>
+    }>
+      <LeadsPageContent />
+    </Suspense>
   )
 }
