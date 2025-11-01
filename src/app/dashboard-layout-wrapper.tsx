@@ -22,11 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       </Navigation>
       <main className="flex-1 w-full">
-        {/* Clone children with props */}
-        {typeof children === 'object' && children !== null && 'type' in children 
-          ? { ...children, props: { ...children.props, selectedDays, setSelectedDays } }
-          : children
-        }
+        {children}
       </main>
     </div>
   )
