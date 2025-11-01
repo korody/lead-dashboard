@@ -41,6 +41,11 @@ function HorizontalBarCustomTooltip(props: TooltipPropsGeneric) {
   return null
 }
 
+// Custom tooltip wrapper component (defined outside to avoid recreation during render)
+const CustomTooltipWrapper = ({ displayedTotal, ...props }: Record<string, unknown> & { displayedTotal: number }) => (
+  <HorizontalBarCustomTooltip {...props} displayedTotal={displayedTotal} />
+)
+
 export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLeads }: InteractiveHorizontalBarChartProps) {
   const sumValues = data.reduce((s, i) => s + i.value, 0)
   const displayedTotal = typeof totalLeads === 'number' ? totalLeads : sumValues
@@ -50,11 +55,6 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
     const pct = typeof d.percentage === 'number' ? d.percentage : (displayedTotal > 0 ? (d.value / displayedTotal * 100) : 0)
     return { ...d, percentage: pct }
   })
-
-  // Custom tooltip wrapper that includes displayedTotal
-  const CustomTooltip = (props: Record<string, unknown>) => (
-    <HorizontalBarCustomTooltip {...props} displayedTotal={displayedTotal} />
-  )
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="h-full">
@@ -72,7 +72,7 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
             <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#ffffff' }} />
             {/* further reduced YAxis width to push bars left */}
             <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 14, fill: '#ffffff' }} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
+            <Tooltip content={<CustomTooltipWrapper displayedTotal={displayedTotal} />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
             <Bar dataKey="value" radius={[8, 8, 8, 8]} isAnimationActive={false}>
               {dataWithPercent.map((entry, i) => (
                 <Cell key={`cell-${entry.name}-${i}`} fill={entry.color} />

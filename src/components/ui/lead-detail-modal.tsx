@@ -31,14 +31,15 @@ interface LeadDetailModalProps {
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps) {
-  if (!lead) return null
-
-  // Calcular dias no sistema usando useMemo para evitar impure function error
+  // Calcular dias no sistema usando useMemo (MUST be before early return)
   const diasNoSistema = useMemo(() => {
+    if (!lead) return 0
     const now = new Date().getTime()
     const createdAt = new Date(lead.created_at).getTime()
     return Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
-  }, [lead.created_at])
+  }, [lead])
+
+  if (!lead) return null
 
   // Gerar referral link baseado no lead (mesmo padrão do backend)
   const generateReferralLink = () => {

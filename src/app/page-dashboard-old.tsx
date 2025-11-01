@@ -80,6 +80,22 @@ export default function DashboardPage() {
   // Removido o loading global - agora cada seção carrega individualmente
   // Isso permite que o dashboard apareça rapidamente e as seções carreguem progressivamente
 
+  // Set sidebar controls (moved before early returns)
+  useEffect(() => {
+    setControls(
+      <DashboardControls
+        selectedDays={selectedDays}
+        onDaysChange={setSelectedDays}
+        isRealTimeEnabled={isRealTimeEnabled}
+        onToggleRealTime={toggleRealTime}
+        onRefresh={refresh}
+      />
+    )
+    
+    return () => setControls(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDays, isRealTimeEnabled])
+
   if (isError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-red-900 flex items-center justify-center">
@@ -105,22 +121,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  // Set sidebar controls
-  useEffect(() => {
-    setControls(
-      <DashboardControls
-        selectedDays={selectedDays}
-        onDaysChange={setSelectedDays}
-        isRealTimeEnabled={isRealTimeEnabled}
-        onToggleRealTime={toggleRealTime}
-        onRefresh={refresh}
-      />
-    )
-    
-    return () => setControls(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDays, isRealTimeEnabled])
 
   return (
     <div className="w-full min-h-screen transition-all duration-500">

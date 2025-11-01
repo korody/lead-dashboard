@@ -34,7 +34,8 @@ export function AnimatedGoalCard({
   const remaining = Math.max(0, safeGoal - safeCurrent)
 
   useEffect(() => {
-    setIsVisible(true)
+    // Use setTimeout to avoid setState during render
+    const visTimer = setTimeout(() => setIsVisible(true), 0)
     
     // Animate number counting
     let start = 0
@@ -51,7 +52,10 @@ export function AnimatedGoalCard({
       }
     }, 16)
 
-    return () => clearInterval(timer)
+    return () => {
+      clearInterval(timer)
+      clearTimeout(visTimer)
+    }
   }, [safeCurrent])
 
   const getColorClass = () => {

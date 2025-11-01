@@ -64,7 +64,9 @@ export function InteractiveLineChart({ data, title, color = "#3b82f6", gradient 
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
-    setIsMounted(true)
+    // Use setTimeout to avoid setState during render
+    const timer = setTimeout(() => setIsMounted(true), 0)
+    return () => clearTimeout(timer)
   }, [])
 
   // Generate mock data similar to the image if no data provided

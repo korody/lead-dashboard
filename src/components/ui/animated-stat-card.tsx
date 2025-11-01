@@ -33,7 +33,8 @@ export function AnimatedStatCard({
   const numericValue = typeof value === 'string' ? parseFloat(value) : value
 
   useEffect(() => {
-    setIsVisible(true)
+    // Use setTimeout to avoid setState during render
+    const visTimer = setTimeout(() => setIsVisible(true), 0)
     
     // Animate number counting
     if (format !== 'percentage' && typeof numericValue === 'number' && numericValue > 0) {
@@ -51,9 +52,13 @@ export function AnimatedStatCard({
         }
       }, 16)
 
-      return () => clearInterval(timer)
+      return () => {
+        clearInterval(timer)
+        clearTimeout(visTimer)
+      }
     } else {
       setDisplayValue(numericValue)
+      return () => clearTimeout(visTimer)
     }
   }, [numericValue, format])
 
