@@ -69,9 +69,10 @@ export class ActiveCampaignClient {
         total,
         contacts: data.contacts || []
       }
-    } catch (error: any) {
-      console.error('Error fetching ActiveCampaign contacts:', error)
-      throw new Error(`Failed to fetch contacts: ${error.message}`)
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Error fetching ActiveCampaign contacts:', err)
+      throw new Error(`Failed to fetch contacts: ${err.message}`)
     }
   }
 
@@ -106,8 +107,9 @@ export class ActiveCampaignClient {
       console.log(`ActiveCampaign: ${total} contacts with tag ${tagId}`)
       
       return total
-    } catch (error: any) {
-      console.error('Error fetching ActiveCampaign total:', error.message)
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Error fetching ActiveCampaign total:', err.message)
       return 0
     }
   }
@@ -183,8 +185,9 @@ export class ActiveCampaignClient {
         total: dentroIntervalo,
         byDay
       }
-    } catch (error: any) {
-      console.error('Error fetching recent contacts:', error)
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Error fetching recent contacts:', err)
       return { total: 0, byDay: {} }
     }
   }

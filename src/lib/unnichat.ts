@@ -126,7 +126,7 @@ class UnnichatClient {
 
       if (!response.ok) {
         const errorText = await response.text()
-        console.error(`Unnichat API error for contact ${contactId}:`, response.status)
+        console.error(`Unnichat API error for contact ${contactId}:`, response.status, errorText.substring(0, 200))
         return []
       }
 
@@ -213,7 +213,7 @@ class UnnichatClient {
         })
         
         const batchResults = await Promise.all(batchPromises)
-        count += batchResults.reduce((sum, val) => sum + val, 0)
+          count += batchResults.reduce((sum: number, val: number) => sum + val, 0)
         
         console.log(`Unnichat: Processed ${i + batch.length}/${contacts.length} contacts, found ${count} requests so far`)
       }

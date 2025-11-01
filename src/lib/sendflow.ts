@@ -115,6 +115,7 @@ class SendFlowClient {
   /**
    * Get total groups count
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async getTotalGroups(releaseId: string): Promise<number> {
     // Por enquanto não temos endpoint específico para contar grupos
     return 0
