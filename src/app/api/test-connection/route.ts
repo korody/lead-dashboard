@@ -54,11 +54,12 @@ export async function GET() {
       sampleError: sampleError?.message
     })
     
-  } catch (err: any) {
-    console.error('Connection test failed:', err)
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('Connection test failed:', error)
     return NextResponse.json({
       success: false,
-      error: err?.message || 'Unknown error'
+      error: error?.message || 'Unknown error'
     })
   }
 }

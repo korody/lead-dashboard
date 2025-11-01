@@ -37,9 +37,9 @@ function normalizeToUiShape(payload: any) {
   ]
 
   const elementosObj = m.distribuicao_elemento_mtc || {}
-  const elementos = Object.entries(elementosObj).map(([elemento, v]: any) => ({
+  const elementos = Object.entries(elementosObj).map(([elemento, v]: [string, unknown]) => ({
     elemento,
-    count: typeof v === 'object' && v ? (v.count ?? 0) : (v ?? 0)
+    count: typeof v === 'object' && v ? ((v as { count?: number }).count ?? 0) : (typeof v === 'number' ? v : 0)
   }))
 
   return {
@@ -165,7 +165,7 @@ export async function GET(request: Request) {
     console.log('🔄 Loading leads from Supabase...')
     
     // Buscar em batches para não ter limite
-    let allLeads: any[] = []
+    let allLeads: Array<Record<string, unknown>> = []
     let start = 0
     const batchSize = 1000
     
@@ -355,7 +355,7 @@ export async function GET(request: Request) {
       
       // Fallback: Buscar do Supabase
       console.log('📊 Buscando evolução temporal do Supabase...')
-      let allData: any[] = []
+      let allData: Array<Record<string, unknown>> = []
       let start = 0
       const batchSize = 1000
       
@@ -422,7 +422,7 @@ export async function GET(request: Request) {
     }
     
     // Função para calcular comparação com período anterior
-    async function calcularComparacaoPeriodo(days: number, currentLeads: any[], totalAC: number, gruposWA: number) {
+    async function calcularComparacaoPeriodo(days: number, currentLeads: Array<Record<string, unknown>>, totalAC: number, gruposWA: number) {
       // Se for "Todo o Tempo" (9999), não faz comparação
       if (days >= 9999) {
         return {
@@ -678,12 +678,13 @@ export async function GET(request: Request) {
     console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
 
   return NextResponse.json({ success: true, metrics })
-  } catch (err: any) {
-    console.error('ERRO 500 MÉTRICAS:', err && err.stack ? err.stack : err);
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error('ERRO 500 MÉTRICAS:', error && error.stack ? error.stack : error);
     // Fallback to mock
     const fallback = mockMetrics();
     return NextResponse.json(
-      { success: false, metrics: fallback, note: 'fallback:error', error: err?.message },
+      { success: false, metrics: fallback, note: 'fallback:error', error: error?.message },
       { status: 500 }
     );
   }

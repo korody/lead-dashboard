@@ -80,8 +80,8 @@ export default function DiagnosticosPage() {
               ) : (
                 <div className="space-y-4">
                   {Object.entries(ELEMENTOS_MTC).map(([key, elem], index) => {
-                    const count = metrics?.elementos?.find((e: any) => e.elemento === key)?.count || 0;
-                    const maxCount = Math.max(...(metrics?.elementos?.map((e: any) => e.count) || [1]));
+                    const count = metrics?.elementos?.find((e: { elemento: string; count: number }) => e.elemento === key)?.count || 0;
+                    const maxCount = Math.max(...(metrics?.elementos?.map((e: { elemento: string; count: number }) => e.count) || [1]));
                     const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
 
                     return (
