@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "../components/providers";
+import { SidebarControlsProvider } from "../contexts/sidebar-controls-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard MTC - Analytics Avançado",
-  description: "Dashboard interativo com analytics em tempo real para Quiz MTC",
-};
+  title: "Lead Dashboard - BNY2",
+  description: "Dashboard de análise de leads e métricas de conversão",
+}
 
 export default function RootLayout({
   children,
@@ -26,10 +27,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-950`}
       >
         <Providers>
-          {children}
+          <SidebarControlsProvider>
+            {children}
+          </SidebarControlsProvider>
         </Providers>
       </body>
     </html>

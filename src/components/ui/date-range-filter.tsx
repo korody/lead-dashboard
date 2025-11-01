@@ -16,21 +16,21 @@ const OPTIONS: { value: DateRangeOption; label: string }[] = [
   { value: 7, label: "Últimos 7 dias" },
   { value: 15, label: "Últimos 15 dias" },
   { value: 30, label: "Últimos 30 dias" },
-  { value: 9999, label: "Todo o Tempo" },
+  { value: 9999, label: "Tempo Todo" },
 ]
 
 export function DateRangeFilter({ selected, onChange }: DateRangeFilterProps) {
-  const [isOpen, setIsOpen] = useState(true)
+  const [isOpen, setIsOpen] = useState(false)
   
   const selectedOption = OPTIONS.find(o => o.value === selected) || OPTIONS[1]
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-indigo-500 dark:hover:border-indigo-400 px-4 py-2 rounded-lg transition-all shadow-sm"
+        className="w-full flex items-center justify-between space-x-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:border-indigo-500 dark:hover:border-indigo-400 px-4 py-2 rounded-lg transition-all shadow-sm"
       >
         <Calendar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -54,7 +54,7 @@ export function DateRangeFilter({ selected, onChange }: DateRangeFilterProps) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full mt-2 right-0 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden"
+            className="absolute top-full mt-2 left-0 right-0 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 overflow-hidden"
           >
             {OPTIONS.map((option) => (
               <button

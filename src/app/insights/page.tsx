@@ -17,7 +17,7 @@ import { ConversionFunnel } from '@/components/charts/conversion-funnel'
 import UrgencyMatrixFull from '@/components/ui/urgency-matrix-full'
 import { DateRangeOption } from '@/components/ui/date-range-filter'
 
-export default function HomePage() {
+export default function InsightsPage() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays)
   const { setControls } = useSidebarControls()

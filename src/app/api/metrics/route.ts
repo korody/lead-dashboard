@@ -133,17 +133,20 @@ export async function GET(request: Request) {
       totalLeadsAC = acTest;
     }
     
-    // Calcular data de corte baseada no período selecionado
+    // Calcular data de corte baseada no período selecionado (timezone Brasil)
     const isTodoTempo = days >= 9999
-    const cutoffDate = new Date()
+    // Usar timezone de São Paulo (UTC-3)
+    const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+    const cutoffDate = new Date(nowBrasil)
     if (!isTodoTempo) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
+      cutoffDate.setHours(0, 0, 0, 0) // Início do dia
     } else {
       cutoffDate.setFullYear(2000) // Data bem antiga para pegar tudo
     }
     const cutoffIso = cutoffDate.toISOString()
     
-    console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`})`)
+    console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
     
     // Buscar count total primeiro (filtrado por período ou tudo)
     let countQuery = supabase
@@ -318,7 +321,8 @@ export async function GET(request: Request) {
           if (days >= 9999 && Object.keys(byDay).length > 0) {
             const diasOrdenados = Object.keys(byDay).sort()
             const primeiraData = diasOrdenados[0]
-            const ultimaData = new Date().toISOString().split('T')[0]
+            const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+            const ultimaData = nowBrasil.toISOString().split('T')[0]
             
             const resultado = []
             const start = new Date(primeiraData)
@@ -333,10 +337,11 @@ export async function GET(request: Request) {
             return resultado
           }
           
-          // Caso normal: preencher todos os dias (mesmo com 0)
+          // Caso normal: preencher todos os dias (mesmo com 0) - Timezone Brasil
           const resultado = []
+          const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
           for(let i=numDays-1;i>=0;i--){ 
-            const d = new Date(Date.now()-i*24*60*60*1000) 
+            const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
             const dia = d.toISOString().split('T')[0] 
             resultado.push({ data: dia, leads: byDay[dia]||0 }) 
           }
@@ -377,7 +382,9 @@ export async function GET(request: Request) {
       
       const porDia: Record<string, number> = {}
       allData.forEach(l => { 
-        const dia = new Date(l.created_at).toISOString().split('T')[0] 
+        // Converter para timezone de São Paulo
+        const dataBrasil = new Date(new Date(l.created_at).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+        const dia = dataBrasil.toISOString().split('T')[0] 
         porDia[dia] = (porDia[dia]||0)+1 
       })
       
@@ -385,7 +392,8 @@ export async function GET(request: Request) {
       if (days >= 9999 && Object.keys(porDia).length > 0) {
         const diasOrdenados = Object.keys(porDia).sort()
         const primeiraData = diasOrdenados[0]
-        const ultimaData = new Date().toISOString().split('T')[0]
+        const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+        const ultimaData = nowBrasil.toISOString().split('T')[0]
         
         const resultado = []
         const start = new Date(primeiraData)
@@ -400,10 +408,11 @@ export async function GET(request: Request) {
         return resultado
       }
       
-      // Caso normal: mostrar últimos N dias
+      // Caso normal: mostrar últimos N dias - Timezone Brasil
       const resultado = []
+      const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
       for(let i=numDays-1;i>=0;i--){ 
-        const d = new Date(Date.now()-i*24*60*60*1000) 
+        const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
         const dia = d.toISOString().split('T')[0] 
         resultado.push({ data: dia, leads: porDia[dia]||0 }) 
       }

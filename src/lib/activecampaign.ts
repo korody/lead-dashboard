@@ -158,8 +158,9 @@ export class ActiveCampaignClient {
       
       console.log(`✅ ${allContacts.length} contatos carregados`)
       
-      // Filtrar e agrupar por udate (data de atualização)
-      const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      // Filtrar e agrupar por udate (data de atualização) - Timezone Brasil
+      const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+      const dataLimite = new Date(nowBrasil.getTime() - days * 24 * 60 * 60 * 1000)
       const byDay: Record<string, number> = {}
       let dentroIntervalo = 0
       
@@ -168,7 +169,9 @@ export class ActiveCampaignClient {
         const updateDate = new Date(contact.udate)
         
         if (updateDate >= dataLimite) {
-          const dia = updateDate.toISOString().split('T')[0]
+          // Converter para timezone brasileiro
+          const dataBrasil = new Date(updateDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+          const dia = dataBrasil.toISOString().split('T')[0]
           byDay[dia] = (byDay[dia] || 0) + 1
           dentroIntervalo++
         }

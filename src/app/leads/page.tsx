@@ -7,11 +7,12 @@ import { Badge } from "../../components/ui/badge"
 import { motion } from "framer-motion"
 import { 
   Search, Filter, Download, Flame, ChevronDown, ChevronUp, 
-  ArrowLeft, SortAsc, SortDesc, Users, Target
+  ArrowLeft, SortAsc, SortDesc, Users, Target, X
 } from "lucide-react"
 import Link from 'next/link'
 import { supabase } from '../../lib/supabase'
 import { ELEMENTOS_MTC } from '../../lib/constants'
+import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
 
 interface Lead {
   id: string
@@ -34,7 +35,9 @@ export default function LeadsPage() {
   const searchParams = useSearchParams()
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [loadingSearch, setLoadingSearch] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filtroElemento, setFiltroElemento] = useState<string>(searchParams?.get('elemento') || 'TODOS')
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>(searchParams?.get('prioridade') || 'TODOS')
@@ -43,11 +46,81 @@ export default function LeadsPage() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [sortField, setSortField] = useState<SortField>('lead_score')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [totalLeads, setTotalLeads] = useState(0)
+  const [paginaAtual, setPaginaAtual] = useState(1)
+  const [isSearching, setIsSearching] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const LEADS_POR_PAGINA = 50
 
   useEffect(() => {
     setIsMounted(true)
     carregarLeads()
+    buscarTotalSupabase()
   }, [])
+
+  // Debounced global search: when user types, query Supabase across ALL leads
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const term = searchTerm.trim()
+      if (term === '') {
+        // if we were searching before, reload the paginated leads
+        if (isSearching) {
+          carregarLeads()
+          setIsSearching(false)
+        }
+        return
+      }
+
+      // perform a global search across nome, email and celular
+      const buscarGlobal = async () => {
+        try {
+          setLoadingSearch(true)
+          const like = `%${term}%`
+          let query: any = supabase
+            .from('quiz_leads')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
+
+          // Apply server-side filters when searching to reduce payload
+          if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
+          if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
+          if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
+          if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
+
+          // Limit to a reasonable max to avoid fetching tens of thousands at once
+          const { data, error } = await query.limit(2000)
+          if (error) throw error
+          setLeads(data || [])
+          setPaginaAtual(1)
+          setIsSearching(true)
+        } catch (err) {
+          console.error('Erro na busca global de leads:', err)
+        } finally {
+          setLoadingSearch(false)
+        }
+      }
+
+      buscarGlobal()
+    }, 300)
+
+    return () => clearTimeout(handler)
+  // include filters so search updates when user changes them while searching
+  }, [searchTerm, filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP])
+
+  const buscarTotalSupabase = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('quiz_leads')
+        .select('*', { count: 'exact', head: true })
+      
+      if (error) throw error
+      setTotalLeads(count || 0)
+    } catch (error) {
+      console.error('Erro ao buscar total do Supabase:', error)
+    }
+  }
 
   const carregarLeads = async () => {
     try {
@@ -56,13 +129,38 @@ export default function LeadsPage() {
         .from('quiz_leads')
         .select('*')
         .order('created_at', { ascending: false })
+        .range(0, LEADS_POR_PAGINA - 1)
       
       if (error) throw error
       setLeads(data || [])
+      setPaginaAtual(1)
     } catch (error) {
       console.error('Erro ao carregar leads:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const carregarMaisLeads = async () => {
+    try {
+      setLoadingMore(true)
+      const proximaPagina = paginaAtual + 1
+      const inicio = (proximaPagina - 1) * LEADS_POR_PAGINA
+      const fim = inicio + LEADS_POR_PAGINA - 1
+      
+      const { data, error } = await supabase
+        .from('quiz_leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(inicio, fim)
+      
+      if (error) throw error
+      setLeads(prev => [...prev, ...(data || [])])
+      setPaginaAtual(proximaPagina)
+    } catch (error) {
+      console.error('Erro ao carregar mais leads:', error)
+    } finally {
+      setLoadingMore(false)
     }
   }
 
@@ -168,6 +266,17 @@ export default function LeadsPage() {
     window.history.replaceState({}, '', '/leads')
   }
 
+  const handleLeadClick = (lead: Lead) => {
+    setSelectedLead(lead)
+    setIsModalOpen(true)
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    // Small delay before clearing to allow exit animation
+    setTimeout(() => setSelectedLead(null), 300)
+  }
+
   const SortIcon = ({ campo }: { campo: SortField }) => {
     if (sortField !== campo) return null
     return sortDirection === 'desc' ? <SortDesc className="w-4 h-4" /> : <SortAsc className="w-4 h-4" />
@@ -175,7 +284,7 @@ export default function LeadsPage() {
 
   if (!isMounted || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 flex items-center justify-center">
+      <div className="w-full min-h-screen flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -198,49 +307,20 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-900 p-4 md:p-8" suppressHydrationWarning>
-      <div className="max-w-7xl mx-auto" suppressHydrationWarning>
-        
-        {/* Header com navegação */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <Link 
-            href="/"
-            className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 mb-4 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            Voltar ao Dashboard
-          </Link>
-        </motion.div>
-
-        {/* Card Principal */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="shadow-2xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg">
+    <div className="w-full" suppressHydrationWarning>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        suppressHydrationWarning
+      >
+        <Card className="shadow-2xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg">
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                     <Users className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-                    Gestão de Leads
+                    Gestão de Leads (Respondentes Diagnóstico)
                   </CardTitle>
-                  <p className="text-gray-600 dark:text-gray-400 mt-2">
-                    {leadsOrdenados.length} de {leads.length} leads
-                    {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP) && (
-                      <button
-                        onClick={limparFiltros}
-                        className="ml-3 text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-                      >
-                        Limpar filtros
-                      </button>
-                    )}
-                  </p>
                 </div>
                 <button
                   onClick={exportarCSV}
@@ -261,19 +341,93 @@ export default function LeadsPage() {
                   placeholder="Buscar por nome, email ou celular..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white transition-all"
+                  className="w-full pl-12 pr-12 py-3 border-2 border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white transition-all"
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
               </div>
 
-              {/* Toggle Filtros */}
-              <button
-                onClick={() => setMostrarFiltros(!mostrarFiltros)}
-                className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors mb-4 font-medium"
-              >
-                <Filter className="w-5 h-5" />
-                Filtros Avançados
-                {mostrarFiltros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              </button>
+              {/* Filtros Avançados + Filtros Ativos + Contador */}
+              <div className="mb-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={() => setMostrarFiltros(!mostrarFiltros)}
+                    className="flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium"
+                  >
+                    <Filter className="w-5 h-5" />
+                    Filtros Avançados
+                    {mostrarFiltros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+
+                  {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP) && (
+                    <>
+                      <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                      {filtroQuadrante !== 'TODOS' && (
+                        <Badge className={`${getCorQuadrante(parseInt(filtroQuadrante))} flex items-center gap-1`}>
+                          Quadrante Q{filtroQuadrante}
+                          <button
+                            onClick={() => setFiltroQuadrante('TODOS')}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {filtroPrioridade !== 'TODOS' && (
+                        <Badge className={`${getCorPrioridade(filtroPrioridade)} flex items-center gap-1`}>
+                          Prioridade: {filtroPrioridade}
+                          <button
+                            onClick={() => setFiltroPrioridade('TODOS')}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {filtroElemento !== 'TODOS' && (
+                        <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 flex items-center gap-1">
+                          {ELEMENTOS_MTC[filtroElemento as keyof typeof ELEMENTOS_MTC]?.emoji} {ELEMENTOS_MTC[filtroElemento as keyof typeof ELEMENTOS_MTC]?.nome}
+                          <button
+                            onClick={() => setFiltroElemento('TODOS')}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {filtroVIP && (
+                        <Badge className="bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 flex items-center gap-1">
+                          <Flame className="w-3 h-3" />
+                          VIP
+                          <button
+                            onClick={() => setFiltroVIP(false)}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      <button
+                        onClick={limparFiltros}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
+                      >
+                        Limpar todos
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  {leadsOrdenados.length} de {totalLeads} leads
+                </div>
+              </div>
 
               {/* Filtros Avançados */}
               {mostrarFiltros && (
@@ -283,24 +437,6 @@ export default function LeadsPage() {
                   exit={{ opacity: 0, height: 0 }}
                   className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-xl"
                 >
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Elemento MTC
-                    </label>
-                    <select
-                      value={filtroElemento}
-                      onChange={(e) => setFiltroElemento(e.target.value)}
-                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white"
-                    >
-                      <option value="TODOS">Todos os Elementos</option>
-                      {Object.entries(ELEMENTOS_MTC).map(([key, elem]) => (
-                        <option key={key} value={key}>
-                          {elem.emoji} {elem.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                       Prioridade
@@ -350,11 +486,50 @@ export default function LeadsPage() {
                       {filtroVIP ? 'Apenas VIPs' : 'Todos'}
                     </button>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Elemento MTC
+                    </label>
+                    <select
+                      value={filtroElemento}
+                      onChange={(e) => setFiltroElemento(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="TODOS">Todos os Elementos</option>
+                      {Object.entries(ELEMENTOS_MTC).map(([key, elem]) => (
+                        <option key={key} value={key}>
+                          {elem.emoji} {elem.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </motion.div>
               )}
 
               {/* Tabela de Leads */}
-              <div className="overflow-x-auto rounded-xl border-2 border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto rounded-xl border-2 border-gray-200 dark:border-gray-700 relative min-h-[400px]">
+                {loadingSearch && (
+                  <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-center"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                        className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full mx-auto mb-3"
+                      />
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                        Buscando...
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        Procurando em todos os leads
+                      </p>
+                    </motion.div>
+                  </div>
+                )}
                 <table className="w-full">
                   <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700">
                     <tr>
@@ -369,15 +544,6 @@ export default function LeadsPage() {
                       </th>
                       <th className="px-6 py-4 text-left">
                         <span className="font-bold text-gray-700 dark:text-gray-200">Contato</span>
-                      </th>
-                      <th className="px-6 py-4 text-left">
-                        <button
-                          onClick={() => alternarOrdenacao('elemento_principal')}
-                          className="flex items-center gap-2 font-bold text-gray-700 dark:text-gray-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                        >
-                          Elemento
-                          <SortIcon campo="elemento_principal" />
-                        </button>
                       </th>
                       <th className="px-6 py-4 text-center">
                         <button
@@ -415,7 +581,8 @@ export default function LeadsPage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.02 }}
-                        className="hover:bg-indigo-50 dark:hover:bg-gray-700/50 transition-colors"
+                        onClick={() => handleLeadClick(lead)}
+                        className="hover:bg-indigo-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -444,14 +611,6 @@ export default function LeadsPage() {
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             {lead.celular}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-2xl">{getIconeElemento(lead.elemento_principal)}</span>
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {ELEMENTOS_MTC[lead.elemento_principal as keyof typeof ELEMENTOS_MTC]?.nome || lead.elemento_principal}
-                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">
@@ -493,10 +652,43 @@ export default function LeadsPage() {
                   </button>
                 </motion.div>
               )}
+
+              {/* Botão Carregar Mais (não disponível durante busca global) */}
+              {!isSearching && leads.length > 0 && leads.length < totalLeads && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={carregarMaisLeads}
+                    disabled={loadingMore}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        Carregando...
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="w-5 h-5" />
+                        Carregar Mais ({leads.length} de {totalLeads})
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>
-      </div>
+
+        {/* Lead Detail Modal */}
+        <LeadDetailModal 
+          lead={selectedLead}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
     </div>
   )
 }

@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion'
 import { Users, ClipboardCheck, MessageCircle, Target, UserPlus, UsersRound, TrendingDown, AlertCircle } from 'lucide-react'
+import { useMemo } from 'react'
 
 interface FunnelData {
   etapas: {
@@ -29,7 +30,7 @@ interface ConversionFunnelProps {
 }
 
 export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunnelProps) {
-  const allStages = [
+  const allStages = useMemo(() => [
     {
       id: 'pdv',
       label: 'Total de Cadastros',
@@ -67,9 +68,12 @@ export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunne
       status: data.etapas.grupos_whatsapp > 0 ? 'active' : 'pending',
       description: data.etapas.grupos_whatsapp === 0 ? 'Configure SENDFLOW_CAMPAIGN_ID no .env.local' : 'Nota: SendFlow não fornece filtro por período - mostra total geral'
     }
-  ]
+  ], [data])
 
-  const stages = hideWhatsApp ? allStages.filter(s => s.id !== 'grupos') : allStages
+  const stages = useMemo(() => 
+    hideWhatsApp ? allStages.filter(s => s.id !== 'grupos') : allStages,
+    [allStages, hideWhatsApp]
+  )
 
   return (
     <div className="space-y-6">
@@ -86,11 +90,8 @@ export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunne
       {/* Etapas do Funil */}
       <div className="grid gap-4">
         {stages.map((stage, index) => (
-          <motion.div
+          <div
             key={stage.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.1 }}
             className="relative"
           >
             {/* Linha conectora */}
@@ -132,6 +133,7 @@ export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunne
                     </div>
                   </div>
 
+
                   {/* Conversion Rate */}
                   {stage.conversionFrom && (
                     <div className="mt-4 flex items-center gap-4">
@@ -152,7 +154,7 @@ export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunne
                         </div>
                         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                           <div 
-                            className={`h-2 rounded-full bg-gradient-to-r ${stage.color} transition-all duration-500`}
+                            className={`h-2 rounded-full bg-gradient-to-r ${stage.color}`}
                             style={{ width: `${stage.conversionRate}%` }}
                           />
                         </div>
@@ -185,7 +187,7 @@ export function ConversionFunnel({ data, hideWhatsApp = false }: ConversionFunne
                 </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
     </div>

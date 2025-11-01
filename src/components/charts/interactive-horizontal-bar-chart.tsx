@@ -51,6 +51,9 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
     return { ...d, percentage: pct }
   })
 
+  // Custom tooltip wrapper that includes displayedTotal
+  const CustomTooltip = (props: any) => <HorizontalBarCustomTooltip {...props} displayedTotal={displayedTotal} />
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="h-full">
       <div className="mb-4">
@@ -67,13 +70,13 @@ export function InteractiveHorizontalBarChart({ data, title, subtitle, totalLead
             <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#ffffff' }} />
             {/* further reduced YAxis width to push bars left */}
             <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} width={120} tick={{ fontSize: 14, fill: '#ffffff' }} />
-            <Tooltip content={<HorizontalBarCustomTooltip displayedTotal={displayedTotal} />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
-            <Bar dataKey="value" radius={[8, 8, 8, 8]}>
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }} />
+            <Bar dataKey="value" radius={[8, 8, 8, 8]} isAnimationActive={false}>
               {dataWithPercent.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
+                <Cell key={`cell-${entry.name}-${i}`} fill={entry.color} />
               ))}
               {/* show percentage label at the end of each bar */}
-              <LabelList dataKey="percentage" position="right" formatter={(v: number) => `${v.toFixed(1)}%`} style={{ fill: '#ffffff', fontSize: 13 }} />
+              <LabelList dataKey="percentage" position="right" formatter={(v: any) => typeof v === 'number' ? `${v.toFixed(1)}%` : ''} style={{ fill: '#ffffff', fontSize: 13 }} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
