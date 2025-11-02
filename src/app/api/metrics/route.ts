@@ -266,15 +266,14 @@ export async function GET(request: Request) {
           if (days >= 9999 && Object.keys(byDay).length > 0) {
             const diasOrdenados = Object.keys(byDay).sort()
             const primeiraData = diasOrdenados[0]
-            const nowBrasil = nowInBRT()
-            const ultimaData = nowBrasil.toISOString().split('T')[0]
+            const ultimaData = ymdBRT() // Data de hoje em BRT
             
             const resultado = []
             const start = new Date(primeiraData)
             const end = new Date(ultimaData)
             
             for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-              const dia = d.toISOString().split('T')[0]
+              const dia = ymdBRT(d) // Usar ymdBRT para garantir formato correto em BRT
               resultado.push({ data: dia, leads: byDay[dia] || 0 })
             }
             
@@ -287,7 +286,7 @@ export async function GET(request: Request) {
           const nowBrasil = nowInBRT()
           for(let i=numDays-1;i>=0;i--){ 
             const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
-            const dia = d.toISOString().split('T')[0] 
+            const dia = ymdBRT(d) // Usar ymdBRT para garantir formato correto em BRT
             resultado.push({ data: dia, leads: byDay[dia]||0 }) 
           }
           
@@ -339,15 +338,14 @@ export async function GET(request: Request) {
       if (days >= 9999 && Object.keys(porDia).length > 0) {
         const diasOrdenados = Object.keys(porDia).sort()
         const primeiraData = diasOrdenados[0]
-  const nowBrasil = nowInBRT()
-        const ultimaData = nowBrasil.toISOString().split('T')[0]
+        const ultimaData = ymdBRT() // Data de hoje em BRT
         
         const resultado = []
         const start = new Date(primeiraData)
         const end = new Date(ultimaData)
         
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          const dia = d.toISOString().split('T')[0]
+          const dia = ymdBRT(d) // Usar ymdBRT para garantir formato correto em BRT
           resultado.push({ data: dia, leads: porDia[dia] || 0 })
         }
         
@@ -357,10 +355,10 @@ export async function GET(request: Request) {
       
       // Caso normal: mostrar últimos N dias - Timezone Brasil
       const resultado = []
-  const nowBrasil = nowInBRT()
+      const nowBrasil = nowInBRT()
       for(let i=numDays-1;i>=0;i--){ 
         const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
-        const dia = d.toISOString().split('T')[0] 
+        const dia = ymdBRT(d) // Usar ymdBRT para garantir formato correto em BRT
         resultado.push({ data: dia, leads: porDia[dia]||0 }) 
       }
       
