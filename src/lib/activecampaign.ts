@@ -104,7 +104,7 @@ export class ActiveCampaignClient {
       const data = await response.json()
       const total = parseInt(data.meta?.total || '0', 10)
       
-      console.log(`ActiveCampaign: ${total} contacts with tag ${tagId}`)
+      // console.log(`ActiveCampaign: ${total} contacts with tag ${tagId}`)
       
       return total
     } catch (error: unknown) {
@@ -125,7 +125,7 @@ export class ActiveCampaignClient {
     }
 
     try {
-      console.log(`📊 Buscando contatos com tag ${tagId} usando campo customizado BNY2_DATA_DO_CADASTRO...`)
+      console.log(`📊 Buscando evolução temporal (${days} dias)...`)
       
       // Buscar TODOS os contatos com a tag E seus campos customizados
       let allContacts: Array<Record<string, unknown>> = []
@@ -159,7 +159,7 @@ export class ActiveCampaignClient {
         offset += limit
       }
       
-      console.log(`✅ ${allContacts.length} contatos carregados com campos customizados`)
+      // console.log(`✅ ${allContacts.length} contatos carregados`)
       
       // Filtrar e agrupar por BNY2_DATA_DO_CADASTRO ou cdate (fallback)
       const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -243,8 +243,7 @@ export class ActiveCampaignClient {
         }
       })
       
-      console.log(`✅ ${dentroIntervalo} contatos nos últimos ${days} dias`)
-      console.log(`   📅 Campo customizado: ${usouCustomField} | cdate: ${usouCdate}`)
+      console.log(`✅ ${dentroIntervalo} contatos | Campo BNY2: ${usouCustomField} | Fallback cdate: ${usouCdate}`)
       
       return {
         total: dentroIntervalo,

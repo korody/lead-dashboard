@@ -34,14 +34,14 @@ export async function GET(request: Request) {
   const requestedDays = parseInt(searchParams.get('days') || '30', 10)
   const days = isNaN(requestedDays) ? 30 : requestedDays
   try {
-    console.log('Starting metrics fetch...')
+    // console.log('Starting metrics fetch...')
     
 
     // Buscar dados do ActiveCampaign e SendFlow em paralelo
     const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
-    console.log('ActiveCampaign Tag ID:', acTagId)
+    // console.log('ActiveCampaign Tag ID:', acTagId)
     const acTest = await activeCampaignClient.getTotalContactsByTag(acTagId)
-    console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
+    // console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
     const sendFlowCampaignId = process.env.SENDFLOW_CAMPAIGN_ID || 'wg2d0SAmMwoRt0kBOVG'
 
     // Pega o total de leads do ActiveCampaign
@@ -63,15 +63,15 @@ export async function GET(request: Request) {
     let totalGruposWhatsApp = 0;
     
     // Buscar dados externos em paralelo
-    console.log('🔄 Fetching external APIs...')
+    // console.log('🔄 Fetching external APIs...')
     const [ac, grupos] = await Promise.all([
       acPromise,
       sendFlowPromise
     ])
     totalLeadsAC = ac;
     totalGruposWhatsApp = grupos;
-    console.log(`✅ ActiveCampaign total: ${totalLeadsAC}`)
-    console.log(`✅ SendFlow total: ${totalGruposWhatsApp}`)
+    // console.log(`✅ ActiveCampaign total: ${totalLeadsAC}`)
+    // console.log(`✅ SendFlow total: ${totalGruposWhatsApp}`)
     
     // Após verificação, atribuir valor de acTest se for válido (fallback)
     if (acTest && typeof acTest === 'number' && acTest > 0 && totalLeadsAC === 0) {
@@ -91,7 +91,7 @@ export async function GET(request: Request) {
     }
     const cutoffIso = cutoffDate.toISOString()
     
-    console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
+    // console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
     
     // Buscar count total primeiro (filtrado por período ou tudo)
     let countQuery = supabase
@@ -104,10 +104,10 @@ export async function GET(request: Request) {
     
   const { count: totalCount } = await countQuery
     
-    console.log(`📊 Total de leads no Supabase: ${totalCount}`)
+    // console.log(`📊 Total de leads no Supabase: ${totalCount}`)
     
     // Buscar TODOS os leads do Supabase sem limite
-    console.log('🔄 Loading leads from Supabase...')
+    // console.log('🔄 Loading leads from Supabase...')
     
     // Buscar em batches para não ter limite
     let allLeads: Array<Record<string, unknown>> = []
@@ -135,7 +135,7 @@ export async function GET(request: Request) {
       if (!data || data.length === 0) break
       
       allLeads = allLeads.concat(data)
-      console.log(`📦 Loaded batch: ${data.length} leads (total so far: ${allLeads.length})`)
+      // console.log(`📦 Loaded batch: ${data.length} leads (total so far: ${allLeads.length})`)
       
       // Se retornou menos que o batch size, chegamos ao fim
       if (data.length < batchSize) break
@@ -145,11 +145,11 @@ export async function GET(request: Request) {
     
     // Erro já tratado no loop acima
     
-    console.error(`✅✅✅ LOADED ${allLeads?.length || 0} LEADS FROM SUPABASE ✅✅✅`)
+    // console.log(`✅ LOADED ${allLeads?.length || 0} LEADS FROM SUPABASE`)
     
     // Se não conseguiu carregar leads, retornar erro
     if (!allLeads || allLeads.length === 0) {
-      console.error('⚠️ No leads found in Supabase')
+      // console.error('⚠️ No leads found in Supabase')
       // Continue mesmo sem leads para não quebrar o dashboard
     }
     
