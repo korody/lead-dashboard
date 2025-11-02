@@ -429,7 +429,7 @@ export async function GET(request: Request) {
       }
     }
 
-    let evolucaoTemporal = await calcularEvolucaoTemporal()
+  const evolucaoTemporal = await calcularEvolucaoTemporal()
     // Assegura que o array inclua o dia de hoje em BRT, mesmo sem leads
     const todayBRT = ymdBRT()
     const lastDay = evolucaoTemporal[evolucaoTemporal.length - 1]?.data
