@@ -33,7 +33,7 @@ export function SimpleTestChart() {
           />
           <YAxis />
           <Tooltip 
-            labelFormatter={(value) => new Date(value).toLocaleDateString('pt-BR')}
+            labelFormatter={(value) => new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
             formatter={(value) => [`${value} leads`, 'Leads']}
           />
           <Area 

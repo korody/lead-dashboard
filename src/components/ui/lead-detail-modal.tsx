@@ -447,7 +447,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   <div className="flex justify-between items-center p-3 bg-gray-800/40 rounded-lg">
                     <span className="text-gray-400">Data de Cadastro:</span>
                     <span className="font-semibold">
-                      {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                      {new Date(lead.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-800/40 rounded-lg">

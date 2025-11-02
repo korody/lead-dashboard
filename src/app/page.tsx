@@ -8,6 +8,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { useRealTimeMetrics } from '@/hooks/use-metrics'
+import { nowInBRT } from '@/lib/utils'
 import { useSidebarControls } from '@/contexts/sidebar-controls-context'
 import { DashboardControls } from '@/components/ui/dashboard-controls'
 import { InteractiveLineChart } from '@/components/charts/interactive-line-chart'
@@ -40,8 +41,13 @@ export default function HomePage() {
       return selectedDays
     }
     
-    const primeiraData = new Date(metrics.evolucaoTemporal[0].data)
-    const hoje = new Date()
+    // Parse a primeira data como meia-noite BRT
+  const primeiraData = new Date(`${metrics.evolucaoTemporal[0].data}T00:00:00-03:00`)
+  // Obtém a data atual em BRT (UTC-3)
+  const hoje = nowInBRT()
+    // Zera as horas para comparar apenas datas
+    hoje.setHours(0, 0, 0, 0)
+    
     const diferencaMilissegundos = hoje.getTime() - primeiraData.getTime()
     const diferencaDias = Math.ceil(diferencaMilissegundos / (1000 * 60 * 60 * 24))
     
@@ -52,11 +58,13 @@ export default function HomePage() {
 
   // Calcula dias e horas restantes até segunda-feira 20h
   const calcularTempoRestante = () => {
-    const agora = new Date()
-    // Próxima segunda-feira às 20h (horário de Brasília)
-    const deadline = new Date('2025-11-03T20:00:00-03:00') // Segunda, 3 de novembro de 2025, 20h BRT
+  // Obtém a data/hora atual em BRT (UTC-3)
+  const agoraBRT = nowInBRT()
     
-    const diferencaMs = deadline.getTime() - agora.getTime()
+    // Deadline: Segunda-feira, 3 de novembro de 2025, 20h BRT
+  const deadline = new Date('2025-11-03T20:00:00-03:00')
+    
+    const diferencaMs = deadline.getTime() - agoraBRT.getTime()
     const diasRestantes = diferencaMs / (1000 * 60 * 60 * 24)
     const horasRestantes = (diferencaMs / (1000 * 60 * 60)) % 24
     
@@ -293,7 +301,7 @@ export default function HomePage() {
                   {/* Progress indicator */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-xs font-bold text-white drop-shadow-lg">
-                      {isLoading ? '' : `${((metrics?.totalDiagnosticos || 0) / 10000 * 100).toFixed(1)}%`}
+                      {isLoading ? '' : `${((metrics?.totalLeads || 0) / 10000 * 100).toFixed(1)}%`}
                     </span>
                   </div>
                 </div>

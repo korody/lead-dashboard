@@ -203,7 +203,7 @@ function LeadsPageContent() {
       lead.prioridade,
       `Q${lead.quadrante}`,
       lead.is_hot_lead_vip ? 'Sim' : 'Não',
-      new Date(lead.created_at).toLocaleDateString('pt-BR')
+  new Date(lead.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     ])
     
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')

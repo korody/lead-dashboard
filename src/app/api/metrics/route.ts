@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { QUADRANTES } from '@/lib/constants'
 import { activeCampaignClient } from '@/lib/activecampaign'
 import { sendFlowClient } from '@/lib/sendflow'
+import { nowInBRT, startOfDayBRT, toBRT, ymdBRT } from '@/lib/utils'
 
 function mockMetrics() {
   return {
@@ -77,10 +78,10 @@ export async function GET(request: Request) {
       totalLeadsAC = acTest;
     }
     
-    // Calcular data de corte baseada no período selecionado (timezone Brasil)
-    const isTodoTempo = days >= 9999
-    // Usar timezone de São Paulo (UTC-3)
-    const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  // Calcular data de corte baseada no período selecionado (timezone Brasil)
+  const isTodoTempo = days >= 9999
+  // Usar timezone de São Paulo (UTC-3)
+  const nowBrasil = nowInBRT()
     const cutoffDate = new Date(nowBrasil)
     if (!isTodoTempo) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
@@ -247,7 +248,7 @@ export async function GET(request: Request) {
     
     // VIPs recentes (últimas 24h)
     const vipsRecentes = allLeads
-      .filter(l => l.is_hot_lead_vip === true && l.created_at && new Date(l.created_at as string) >= new Date(Date.now()-24*60*60*1000))
+      .filter(l => l.is_hot_lead_vip === true && l.created_at && toBRT(l.created_at as string) >= new Date(nowBrasil.getTime()-24*60*60*1000))
       .slice(0, 10)
 
     // Calcular evolução temporal dos leads
@@ -265,7 +266,7 @@ export async function GET(request: Request) {
           if (days >= 9999 && Object.keys(byDay).length > 0) {
             const diasOrdenados = Object.keys(byDay).sort()
             const primeiraData = diasOrdenados[0]
-            const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+            const nowBrasil = nowInBRT()
             const ultimaData = nowBrasil.toISOString().split('T')[0]
             
             const resultado = []
@@ -283,7 +284,7 @@ export async function GET(request: Request) {
           
           // Caso normal: preencher todos os dias (mesmo com 0) - Timezone Brasil
           const resultado = []
-          const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+          const nowBrasil = nowInBRT()
           for(let i=numDays-1;i>=0;i--){ 
             const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
             const dia = d.toISOString().split('T')[0] 
@@ -328,7 +329,7 @@ export async function GET(request: Request) {
       allData.forEach(l => { 
         // Converter para timezone de São Paulo
         if (l.created_at) {
-          const dataBrasil = new Date(new Date(l.created_at as string).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+          const dataBrasil = toBRT(l.created_at as string)
           const dia = dataBrasil.toISOString().split('T')[0] 
           porDia[dia] = (porDia[dia]||0)+1 
         }
@@ -338,7 +339,7 @@ export async function GET(request: Request) {
       if (days >= 9999 && Object.keys(porDia).length > 0) {
         const diasOrdenados = Object.keys(porDia).sort()
         const primeiraData = diasOrdenados[0]
-        const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const nowBrasil = nowInBRT()
         const ultimaData = nowBrasil.toISOString().split('T')[0]
         
         const resultado = []
@@ -356,7 +357,7 @@ export async function GET(request: Request) {
       
       // Caso normal: mostrar últimos N dias - Timezone Brasil
       const resultado = []
-      const nowBrasil = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const nowBrasil = nowInBRT()
       for(let i=numDays-1;i>=0;i--){ 
         const d = new Date(nowBrasil.getTime() - i*24*60*60*1000) 
         const dia = d.toISOString().split('T')[0] 
@@ -430,7 +431,13 @@ export async function GET(request: Request) {
       }
     }
 
-    const evolucaoTemporal = await calcularEvolucaoTemporal()
+    let evolucaoTemporal = await calcularEvolucaoTemporal()
+    // Assegura que o array inclua o dia de hoje em BRT, mesmo sem leads
+    const todayBRT = ymdBRT()
+    const lastDay = evolucaoTemporal[evolucaoTemporal.length - 1]?.data
+    if (lastDay !== todayBRT) {
+      evolucaoTemporal.push({ data: todayBRT, leads: 0 })
+    }
 
     
 
@@ -576,15 +583,15 @@ export async function GET(request: Request) {
     // VIPs recentes (últimas 24h)
     const vips24h = vipsRecentes || []
 
-    // Resumo diário
-    const hoje = new Date(); hoje.setHours(0,0,0,0); const hoje_iso = hoje.toISOString()
-    const leads_hoje = allLeads?.filter(l => l.created_at && new Date(l.created_at as string) >= hoje) || []
+  // Resumo diário (BRT)
+  const hoje = startOfDayBRT(); const hoje_iso = hoje.toISOString()
+  const leads_hoje = allLeads?.filter(l => l.created_at && toBRT(l.created_at as string) >= hoje) || []
     const vips_hoje = vipsRecentes?.length || 0
-    const envios_hoje = logsData?.filter(l => l.created_at && new Date(l.created_at as string) >= hoje) || []
+  const envios_hoje = logsData?.filter(l => l.created_at && toBRT(l.created_at as string) >= hoje) || []
     const envios_sucesso = envios_hoje?.filter(l=>l.status==='sent' || l.status==='success').length || 0
     const taxa_sucesso_envios = envios_hoje.length>0 ? ((envios_sucesso/envios_hoje.length)*100).toFixed(1) : 0
     const resumo_diario = {
-      data: hoje.toISOString().split('T')[0],
+  data: ymdBRT(hoje),
       total_leads: leads_hoje.length,
       leads_vip: vips_hoje,
       total_envios: envios_hoje.length,

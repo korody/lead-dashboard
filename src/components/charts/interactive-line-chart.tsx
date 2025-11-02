@@ -17,10 +17,11 @@ function LineChartCustomTooltip(props: unknown) {
   const p = props as { active?: boolean; payload?: unknown[] }
   const { active, payload } = p
   if (active && Array.isArray(payload) && payload.length) {
-    const first = payload[0] as { value?: number; payload?: Record<string, unknown> }
+  const first = payload[0] as { value?: number; payload?: Record<string, unknown> }
     const value = typeof first.value === 'number' ? first.value : (typeof first.value === 'string' ? Number(first.value) : 0)
     const originalData = first.payload?.data as string | undefined
-    const date = originalData ? new Date(originalData) : new Date()
+  // Parse como meia-noite no fuso de Brasília para evitar regressão de um dia
+  const date = originalData ? new Date(`${originalData}T00:00:00-03:00`) : new Date()
     const dateFormatted = date.toLocaleDateString('pt-BR', { 
       weekday: 'long', 
       year: 'numeric', 
@@ -100,8 +101,18 @@ export function InteractiveLineChart({ data, title, color = "#3b82f6", gradient 
   console.log('InteractiveLineChart - Using chartData:', chartData)
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })
+    // Evita parse UTC (YYYY-MM-DD) -> dia anterior em BRT. Formata via string.
+    const parts = dateStr.split('-')
+    if (parts.length === 3) {
+      const [y, m, d] = parts
+      return `${d}/${m}`
+    }
+    try {
+      const date = new Date(`${dateStr}T00:00:00-03:00`)
+      return date.toLocaleDateString('pt-BR', { month: '2-digit', day: '2-digit' })
+    } catch {
+      return dateStr
+    }
   }
 
   // use module-level LineChartCustomTooltip instead of inline component
