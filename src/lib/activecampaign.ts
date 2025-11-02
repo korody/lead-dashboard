@@ -127,14 +127,52 @@ export class ActiveCampaignClient {
     try {
       console.log(`📊 Buscando evolução temporal (${days} dias)...`)
       
-      // Buscar TODOS os contatos com a tag E seus campos customizados
+      // PASSO 1: Buscar todos os fieldValues do campo 150 (BNY2 - Data do Cadastro)
+      console.log(`   📝 Carregando campo 150...`)
+      const field150Map = new Map<string, string>() // contactId -> data
+      let offset150 = 0
+      const limit150 = 100
+      
+      while (true) {
+        const url150 = `${this.baseUrl}/api/3/fieldValues?filters[fieldid]=150&limit=${limit150}&offset=${offset150}`
+        
+        const response150 = await fetch(url150, {
+          method: 'GET',
+          headers: {
+            'Api-Token': this.apiKey,
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (!response150.ok) break
+
+        const data150 = await response150.json()
+        const fieldValues = data150.fieldValues || []
+        
+        if (fieldValues.length === 0) break
+        
+        // Armazenar mapeamento contactId -> data
+        fieldValues.forEach((fv: { contact: string; value: string }) => {
+          if (fv.contact && fv.value) {
+            field150Map.set(fv.contact, fv.value)
+          }
+        })
+        
+        const total150 = parseInt(data150.meta?.total || '0', 10)
+        if (field150Map.size >= total150) break
+        
+        offset150 += limit150
+      }
+      
+      console.log(`   ✅ ${field150Map.size} contatos com campo 150`)
+      
+      // PASSO 2: Buscar TODOS os contatos com a tag
       let allContacts: Array<Record<string, unknown>> = []
       let offset = 0
       const limit = 100
       
       while (true) {
-        // Incluir fieldValues para obter campos customizados
-        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}&include=fieldValues`
+        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}`
         
         const response = await fetch(url, {
           method: 'GET',
@@ -173,48 +211,36 @@ export class ActiveCampaignClient {
         contatoIndex++
         let cadastroDate: Date | null = null
         
-        // Tentar obter data do campo customizado primeiro
-        const fieldValues = (contact as { fieldValues?: Array<{ field: string; value: string }> }).fieldValues
-        if (fieldValues && Array.isArray(fieldValues)) {
-          // DEBUG: Log dos primeiros 3 contatos para ver estrutura
-          if (contatoIndex === 1 && fieldValues.length > 0) {
-            console.log('🔍 DEBUG - fieldValues do primeiro contato:')
-            fieldValues.forEach(fv => {
-              console.log(`   field="${fv.field}" | value="${fv.value}"`)
-            })
+        const contactId = String((contact as { id?: string }).id || '')
+        
+        // BUSCAR NO MAPA do campo 150
+        const valorCampo150 = field150Map.get(contactId)
+        
+        if (valorCampo150) {
+          // DEBUG: Log do primeiro contato com campo 150
+          if (usouCustomField === 0) {
+            console.log(`🔍 Primeiro contato com campo 150:`)
+            console.log(`   ID: ${contactId} | Email: ${(contact as {email?: string}).email}`)
+            console.log(`   Campo 150 valor: "${valorCampo150}"`)
           }
           
-          // Procurar especificamente pelo campo BNY2_DATA_DO_CADASTRO
-          const bnyField = fieldValues.find(f => 
-            f.field && (
-              f.field.toString().toUpperCase().includes('BNY2_DATA_DO_CADASTRO') ||
-              f.field.toString().toUpperCase().includes('%BNY2_DATA_DO_CADASTRO%') ||
-              f.field.toString().includes('BNY2') || 
-              f.field.toString().toLowerCase().includes('cadastro')
-            )
-          )
+          // Parsear a data do campo customizado (formato esperado: YYYY-MM-DD)
+          const valorData = valorCampo150.trim()
           
-          if (bnyField && bnyField.value) {
-            // Tentar parsear a data do campo customizado
-            // Pode vir em formato ISO, timestamp, ou dd/mm/yyyy
-            const valorData = bnyField.value.trim()
-            
-            // Tentar diferentes formatos
-            if (valorData.match(/^\d{4}-\d{2}-\d{2}/)) {
-              // Formato ISO: 2025-11-02
-              cadastroDate = new Date(valorData)
-            } else if (valorData.match(/^\d{2}\/\d{2}\/\d{4}/)) {
-              // Formato BR: 02/11/2025
-              const [dia, mes, ano] = valorData.split('/')
-              cadastroDate = new Date(`${ano}-${mes}-${dia}`)
-            } else if (!isNaN(Number(valorData))) {
-              // Timestamp Unix
-              cadastroDate = new Date(Number(valorData) * 1000)
-            }
-            
-            if (cadastroDate && !isNaN(cadastroDate.getTime())) {
-              usouCustomField++
-            }
+          // Tentar diferentes formatos
+          if (valorData.match(/^\d{4}-\d{2}-\d{2}/)) {
+            // Formato ISO: 2025-11-02
+            cadastroDate = new Date(valorData)
+            usouCustomField++
+          } else if (valorData.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+            // Formato BR: 02/11/2025
+            const [dia, mes, ano] = valorData.split('/')
+            cadastroDate = new Date(`${ano}-${mes}-${dia}`)
+            usouCustomField++
+          } else if (!isNaN(Number(valorData))) {
+            // Timestamp Unix
+            cadastroDate = new Date(Number(valorData) * 1000)
+            usouCustomField++
           }
         }
         

@@ -1,8 +1,10 @@
-require('dotenv').config({ path: '.env.local' });
 const https = require('https');
+const fs = require('fs');
 
-const AC_API_URL = process.env.ACTIVECAMPAIGN_API_URL;
-const AC_API_KEY = process.env.ACTIVECAMPAIGN_API_KEY;
+// Ler .env.local manualmente
+const envContent = fs.readFileSync('.env.local', 'utf8');
+const AC_API_URL = envContent.match(/ACTIVECAMPAIGN_API_URL=(.+)/)[1].trim();
+const AC_API_KEY = envContent.match(/ACTIVECAMPAIGN_API_KEY=(.+)/)[1].trim();
 
 console.log('🔍 Testando fieldValues do ActiveCampaign\n');
 console.log(`API URL: ${AC_API_URL}`);
@@ -46,9 +48,12 @@ const req = https.request(options, (res) => {
         if (fieldValues.length === 0) {
           console.log('   ⚠️  NENHUM fieldValue encontrado!\n');
         } else {
+          console.log('   Estrutura completa:', JSON.stringify(fieldValues, null, 2));
+          
           fieldValues.forEach((fv, i) => {
-            console.log(`\n   [${i + 1}] field: "${fv.field}"`);
-            console.log(`       value: "${fv.value}"`);
+            console.log(`\n   [${i + 1}] Objeto completo:`, fv);
+            console.log(`       typeof field: ${typeof fv.field}`);
+            console.log(`       typeof value: ${typeof fv.value}`);
             
             // Verificar se é o campo que procuramos
             const fieldStr = String(fv.field);
