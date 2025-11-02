@@ -627,7 +627,7 @@ export async function GET(request: Request) {
       comparison
     }
 
-  console.log('Métricas retornadas para o frontend:', JSON.stringify(metrics, null, 2));
+  console.log(`✅ API retornando: ${totalLeadsAC} leads AC | ${allLeads.length} diagnósticos | ${evolucaoTemporal.length} dias`)
 
   return NextResponse.json({ success: true, metrics })
   } catch (err: unknown) {
