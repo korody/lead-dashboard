@@ -167,13 +167,23 @@ export class ActiveCampaignClient {
       let dentroIntervalo = 0
       let usouCustomField = 0
       let usouCdate = 0
+      let contatoIndex = 0
       
       allContacts.forEach((contact: Record<string, unknown>) => {
+        contatoIndex++
         let cadastroDate: Date | null = null
         
         // Tentar obter data do campo customizado primeiro
         const fieldValues = (contact as { fieldValues?: Array<{ field: string; value: string }> }).fieldValues
         if (fieldValues && Array.isArray(fieldValues)) {
+          // DEBUG: Log dos primeiros 3 contatos para ver estrutura
+          if (contatoIndex === 1 && fieldValues.length > 0) {
+            console.log('🔍 DEBUG - fieldValues do primeiro contato:')
+            fieldValues.forEach(fv => {
+              console.log(`   field="${fv.field}" | value="${fv.value}"`)
+            })
+          }
+          
           // Procurar especificamente pelo campo BNY2_DATA_DO_CADASTRO
           const bnyField = fieldValues.find(f => 
             f.field && (
