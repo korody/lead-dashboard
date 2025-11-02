@@ -52,12 +52,12 @@ interface StoicLoadingOverlayProps {
 }
 
 export function StoicLoadingOverlay({ message = "Carregando insights..." }: StoicLoadingOverlayProps) {
-  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0)
+  // Randomiza a primeira citação no useState
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(() => 
+    Math.floor(Math.random() * STOIC_QUOTES.length)
+  )
 
   useEffect(() => {
-    // Randomiza a primeira citação
-    setCurrentQuoteIndex(Math.floor(Math.random() * STOIC_QUOTES.length))
-
     // Muda a citação a cada 6 segundos
     const interval = setInterval(() => {
       setCurrentQuoteIndex((prev) => (prev + 1) % STOIC_QUOTES.length)
@@ -112,7 +112,7 @@ export function StoicLoadingOverlay({ message = "Carregando insights..." }: Stoi
                 <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z" />
               </svg>
               <p className="text-2xl md:text-3xl font-light text-white leading-relaxed italic px-8">
-                "{currentQuote.text}"
+                &ldquo;{currentQuote.text}&rdquo;
               </p>
             </div>
             <p className="text-lg text-white/70 font-medium">
