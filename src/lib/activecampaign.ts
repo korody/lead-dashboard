@@ -116,8 +116,8 @@ export class ActiveCampaignClient {
 
   /**
    * Busca contatos nos últimos N dias
-   * USA UPDATED_DATE (udate) ao invés de created_date para melhor precisão
-   * udate é atualizado quando campos customizados são preenchidos
+   * USA CAMPO CUSTOMIZADO %BNY2_DATA_DO_CADASTRO% para data exata do evento
+   * Fallback para cdate se o campo customizado não existir
    */
   async getRecentContactsByTag(tagId: number, days: number = 30): Promise<{ total: number; byDay: Record<string, number> }> {
     if (!this.isConfigured()) {
@@ -125,15 +125,16 @@ export class ActiveCampaignClient {
     }
 
     try {
-      console.log(`📊 Buscando contatos com tag ${tagId} usando updated_date...`)
+      console.log(`📊 Buscando contatos com tag ${tagId} usando campo customizado BNY2_DATA_DO_CADASTRO...`)
       
-  // Buscar TODOS os contatos com a tag (sem filtro de data na API)
-  let allContacts: Array<Record<string, unknown>> = []
+      // Buscar TODOS os contatos com a tag E seus campos customizados
+      let allContacts: Array<Record<string, unknown>> = []
       let offset = 0
       const limit = 100
       
       while (true) {
-        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}`
+        // Incluir fieldValues para obter campos customizados
+        const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}&include=fieldValues`
         
         const response = await fetch(url, {
           method: 'GET',
@@ -158,20 +159,67 @@ export class ActiveCampaignClient {
         offset += limit
       }
       
-      console.log(`✅ ${allContacts.length} contatos carregados`)
+      console.log(`✅ ${allContacts.length} contatos carregados com campos customizados`)
       
-      // Filtrar e agrupar por udate (data de atualização) - Timezone Brasil
+      // Filtrar e agrupar por BNY2_DATA_DO_CADASTRO ou cdate (fallback)
       const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
       const byDay: Record<string, number> = {}
       let dentroIntervalo = 0
+      let usouCustomField = 0
+      let usouCdate = 0
       
       allContacts.forEach((contact: Record<string, unknown>) => {
-        // Usar UDATE (updated date) ao invés de CDATE (created date)
-        const updateRaw = (contact as { udate?: string }).udate
-        if (!updateRaw) return
-        const updateDate = new Date(updateRaw)
+        let cadastroDate: Date | null = null
         
-        if (updateDate >= dataLimite) {
+        // Tentar obter data do campo customizado primeiro
+        const fieldValues = (contact as { fieldValues?: Array<{ field: string; value: string }> }).fieldValues
+        if (fieldValues && Array.isArray(fieldValues)) {
+          // Procurar especificamente pelo campo BNY2_DATA_DO_CADASTRO
+          const bnyField = fieldValues.find(f => 
+            f.field && (
+              f.field.toString().toUpperCase().includes('BNY2_DATA_DO_CADASTRO') ||
+              f.field.toString().toUpperCase().includes('%BNY2_DATA_DO_CADASTRO%') ||
+              f.field.toString().includes('BNY2') || 
+              f.field.toString().toLowerCase().includes('cadastro')
+            )
+          )
+          
+          if (bnyField && bnyField.value) {
+            // Tentar parsear a data do campo customizado
+            // Pode vir em formato ISO, timestamp, ou dd/mm/yyyy
+            const valorData = bnyField.value.trim()
+            
+            // Tentar diferentes formatos
+            if (valorData.match(/^\d{4}-\d{2}-\d{2}/)) {
+              // Formato ISO: 2025-11-02
+              cadastroDate = new Date(valorData)
+            } else if (valorData.match(/^\d{2}\/\d{2}\/\d{4}/)) {
+              // Formato BR: 02/11/2025
+              const [dia, mes, ano] = valorData.split('/')
+              cadastroDate = new Date(`${ano}-${mes}-${dia}`)
+            } else if (!isNaN(Number(valorData))) {
+              // Timestamp Unix
+              cadastroDate = new Date(Number(valorData) * 1000)
+            }
+            
+            if (cadastroDate && !isNaN(cadastroDate.getTime())) {
+              usouCustomField++
+            }
+          }
+        }
+        
+        // Fallback para cdate se não conseguiu obter do campo customizado
+        if (!cadastroDate || isNaN(cadastroDate.getTime())) {
+          const createRaw = (contact as { cdate?: string }).cdate
+          if (createRaw) {
+            cadastroDate = new Date(createRaw)
+            usouCdate++
+          }
+        }
+        
+        if (!cadastroDate || isNaN(cadastroDate.getTime())) return
+        
+        if (cadastroDate >= dataLimite) {
           // Converter para timezone brasileiro usando Intl.DateTimeFormat
           const formatter = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'America/Sao_Paulo',
@@ -179,13 +227,14 @@ export class ActiveCampaignClient {
             month: '2-digit',
             day: '2-digit'
           })
-          const dia = formatter.format(updateDate)
+          const dia = formatter.format(cadastroDate)
           byDay[dia] = (byDay[dia] || 0) + 1
           dentroIntervalo++
         }
       })
       
-      console.log(`✅ ${dentroIntervalo} contatos atualizados nos últimos ${days} dias (via udate)`)
+      console.log(`✅ ${dentroIntervalo} contatos nos últimos ${days} dias`)
+      console.log(`   📅 Campo customizado: ${usouCustomField} | cdate: ${usouCdate}`)
       
       return {
         total: dentroIntervalo,
