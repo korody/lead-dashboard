@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   Target,
@@ -15,11 +15,24 @@ import { InteractiveHorizontalBarChart } from '@/components/charts/interactive-h
 import { ConversionFunnel } from '@/components/charts/conversion-funnel'
 import UrgencyMatrixFull from '@/components/ui/urgency-matrix-full'
 import { DateRangeOption } from '@/components/ui/date-range-filter'
+import { StoicLoadingOverlay } from '@/components/ui/stoic-loading-overlay'
 
 export default function HomePage() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
+  const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
   const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays)
   const { setControls } = useSidebarControls()
+
+  // Esconde o overlay após os dados carregarem
+  useEffect(() => {
+    if (!isLoading && metrics) {
+      // Aguarda um pouco para dar tempo de mostrar a última citação
+      const timer = setTimeout(() => {
+        setShowLoadingOverlay(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [isLoading, metrics])
 
   // Calcula o número real de dias desde o primeiro lead
   const calcularDiasReais = () => {
@@ -36,6 +49,27 @@ export default function HomePage() {
   }
 
   const diasReais = selectedDays >= 9999 ? calcularDiasReais() : selectedDays
+
+  // Calcula dias e horas restantes até segunda-feira 20h
+  const calcularTempoRestante = () => {
+    const agora = new Date()
+    // Próxima segunda-feira às 20h (horário de Brasília)
+    const deadline = new Date('2025-11-03T20:00:00-03:00') // Segunda, 3 de novembro de 2025, 20h BRT
+    
+    const diferencaMs = deadline.getTime() - agora.getTime()
+    const diasRestantes = diferencaMs / (1000 * 60 * 60 * 24)
+    const horasRestantes = (diferencaMs / (1000 * 60 * 60)) % 24
+    
+    return {
+      dias: Math.floor(diasRestantes),
+      horas: Math.floor(horasRestantes),
+      total: diasRestantes
+    }
+  }
+
+  const tempoRestante = calcularTempoRestante()
+  const leadsRestantes = 10000 - (metrics?.totalLeads || 0)
+  const leadsPorDia = tempoRestante.total > 0 ? Math.ceil(leadsRestantes / tempoRestante.total) : 0
 
   // Set sidebar controls
   useEffect(() => {
@@ -54,10 +88,18 @@ export default function HomePage() {
   }, [selectedDays, isRealTimeEnabled])
 
   return (
-    <div className="w-full min-h-screen transition-all duration-500">
-      <div className="p-8 space-y-8">
-        {/* Advanced Animated Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <>
+      {/* Overlay de carregamento com frases estoicas */}
+      <AnimatePresence>
+        {showLoadingOverlay && (
+          <StoicLoadingOverlay message="Carregando insights do dashboard..." />
+        )}
+      </AnimatePresence>
+
+      <div className="w-full min-h-screen transition-all duration-500">
+        <div className="p-8 space-y-8">
+          {/* Advanced Animated Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -166,6 +208,127 @@ export default function HomePage() {
             </motion.div>
           )}
         </div>
+
+        {/* Campaign Goal Progress Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        >
+          <Card className="shadow-2xl border-0 overflow-hidden bg-gradient-to-br from-gray-900 via-indigo-950 to-purple-950 relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 animate-pulse" />
+            <CardContent className="p-5 relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <div className="p-1.5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-lg">
+                      <Target className="w-4 h-4 text-white" />
+                    </div>
+                    Meta de Leads
+                  </h3>
+                  <p className="text-gray-400 text-xs mt-1">Campanha BNY2 - Objetivo: 10.000 leads</p>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-black bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">
+                    {isLoading ? '...' : `${((metrics?.totalLeads || 0) / 10000 * 100).toFixed(1)}%`}
+                  </div>
+                  <p className="text-gray-400 text-xs">da meta</p>
+                </div>
+              </div>
+
+              {/* Progress Visualization */}
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.5, type: "spring" }}
+                        className="text-2xl font-black text-white"
+                      >
+                        {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
+                      </motion.div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Atual</p>
+                    </div>
+                    <div className="text-xl text-gray-600">/</div>
+                    <div className="text-center">
+                      <div className="text-2xl font-black text-gray-400">10.000</div>
+                      <p className="text-[10px] text-gray-500 mt-0.5">Meta</p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-right">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.6, type: "spring" }}
+                      className="text-2xl font-bold text-amber-400"
+                    >
+                      {isLoading ? '...' : `${(10000 - (metrics?.totalLeads || 0)).toLocaleString('pt-BR')}`}
+                    </motion.div>
+                    <p className="text-[10px] text-gray-400 mt-0.5">Faltam</p>
+                  </div>
+                </div>
+
+                {/* Animated Progress Bar */}
+                <div className="relative h-4 bg-gray-800/50 rounded-full overflow-hidden border border-gray-700/50 backdrop-blur-sm">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ 
+                      width: `${Math.min(((metrics?.totalLeads || 0) / 10000 * 100), 100)}%` 
+                    }}
+                    transition={{ duration: 1.5, delay: 0.4, ease: "easeOut" }}
+                    className="h-full bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 rounded-full relative overflow-hidden"
+                  >
+                    {/* Shine effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" 
+                         style={{ 
+                           backgroundSize: '200% 100%',
+                           animation: 'shimmer 2s infinite'
+                         }} 
+                    />
+                  </motion.div>
+                  
+                  {/* Progress indicator */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-bold text-white drop-shadow-lg">
+                      {isLoading ? '' : `${((metrics?.totalDiagnosticos || 0) / 10000 * 100).toFixed(1)}%`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Stats */}
+              <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-700/50">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-400">
+                    {isLoading ? '...' : diasReais}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Dias de Captação</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-emerald-400">
+                    {isLoading ? '...' : Math.round((metrics?.totalLeads || 0) / Math.max(diasReais, 1)).toLocaleString('pt-BR')}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Leads Captados por Dia (média)</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-rose-400">
+                    {isLoading ? '...' : leadsPorDia.toLocaleString('pt-BR')}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Leads Necessários por Dia</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-amber-400">
+                    {isLoading ? '...' : `${tempoRestante.dias}d ${tempoRestante.horas}h`}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">até Encerramento Captação (03/11, 20hrs)</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Interactive Timeline Chart - Evolução Temporal */}
         <motion.div
@@ -410,5 +573,6 @@ export default function HomePage() {
         </motion.div>
       </div>
     </div>
+    </>
   )
 }
