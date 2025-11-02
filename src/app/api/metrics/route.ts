@@ -433,9 +433,14 @@ export async function GET(request: Request) {
     // Assegura que o array inclua o dia de hoje em BRT, mesmo sem leads
     const todayBRT = ymdBRT()
     const lastDay = evolucaoTemporal[evolucaoTemporal.length - 1]?.data
+    console.log(`🗓️  Verificando último dia: lastDay="${lastDay}" vs todayBRT="${todayBRT}"`)
     if (lastDay !== todayBRT) {
+      console.log(`➕ Adicionando dia ${todayBRT} ao final do array`)
       evolucaoTemporal.push({ data: todayBRT, leads: 0 })
+    } else {
+      console.log(`✅ Último dia já está correto: ${todayBRT}`)
     }
+    console.log(`📊 Evolução temporal final: ${evolucaoTemporal.length} dias, de ${evolucaoTemporal[0]?.data} até ${evolucaoTemporal[evolucaoTemporal.length - 1]?.data}`)
 
     
 
