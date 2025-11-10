@@ -177,8 +177,8 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     status: 'active',
-    endpoint: '/api/webhook/activecampaign',
-    description: 'Webhook para receber eventos do ActiveCampaign',
+    endpoint: '/api/webhook/update-student-status',
+    description: 'Webhook para atualizar status de alunos quando adicionados a listas no ActiveCampaign',
     usage: 'Configure este URL no ActiveCampaign webhook settings'
   })
 }

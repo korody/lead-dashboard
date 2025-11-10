@@ -2,7 +2,7 @@
 
 ## Endpoint Criado
 
-**URL do Webhook:** `https://seu-dominio.com/api/webhook/activecampaign`
+**URL do Webhook:** `https://dash.mestreye.com/api/webhook/update-student-status`
 
 Este endpoint recebe notificações do ActiveCampaign quando um contato é adicionado a uma lista de alunos e atualiza automaticamente os campos `is_aluno` e `is_aluno_bny2` no Supabase.
 
@@ -20,8 +20,8 @@ Este endpoint recebe notificações do ActiveCampaign quando um contato é adici
 
 1. Clique em **Add a webhook**
 2. Preencha os campos:
-   - **Webhook name:** `Atualizar Alunos Supabase`
-   - **URL to call:** `https://seu-dominio.com/api/webhook/activecampaign`
+   - **Webhook name:** `Atualizar Status Alunos Supabase`
+   - **URL to call:** `https://dash.mestreye.com/api/webhook/update-student-status`
    - **Action:** Selecione `Subscribe to list`
    - **Sources:** Selecione as listas de alunos relevantes
 
@@ -71,14 +71,14 @@ O endpoint identifica automaticamente qual campo atualizar baseado no **nome da 
 
 ### 1. Testar se está ativo
 ```bash
-curl https://seu-dominio.com/api/webhook/activecampaign
+curl https://dash.mestreye.com/api/webhook/update-student-status
 ```
 
 Resposta esperada:
 ```json
 {
   "status": "active",
-  "endpoint": "/api/webhook/activecampaign",
+  "endpoint": "/api/webhook/update-student-status",
   "description": "Webhook para receber eventos do ActiveCampaign",
   "usage": "Configure este URL no ActiveCampaign webhook settings"
 }
@@ -86,7 +86,7 @@ Resposta esperada:
 
 ### 2. Testar manualmente com POST
 ```bash
-curl -X POST https://seu-dominio.com/api/webhook/activecampaign \
+curl -X POST https://dash.mestreye.com/api/webhook/update-student-status \
   -H "Content-Type: application/json" \
   -d '{
     "type": "subscribe",
@@ -235,8 +235,8 @@ updateData = {
 
 Quando fizer deploy, configure a URL completa no ActiveCampaign:
 
-- **Vercel:** `https://seu-app.vercel.app/api/webhook/activecampaign`
-- **Outro host:** `https://seu-dominio.com/api/webhook/activecampaign`
+- **Vercel:** `https://dash.mestreye.com/api/webhook/update-student-status`
+- **Outro host:** `https://seu-dominio.com/api/webhook/update-student-status`
 
 ---
 

@@ -3,7 +3,7 @@
 ## 📁 Arquivos Criados
 
 ### 1. **Endpoint API** 
-`src/app/api/webhook/activecampaign/route.ts`
+`src/app/api/webhook/update-student-status/route.ts`
 - Recebe webhooks do ActiveCampaign
 - Busca lead no Supabase pelo email
 - Atualiza campos `is_aluno` e `is_aluno_bny2`
@@ -38,7 +38,7 @@ node test-webhook-activecampaign.js
 
 Configure no ActiveCampaign:
 ```
-URL: https://seu-dominio.vercel.app/api/webhook/activecampaign
+URL: https://dash.mestreye.com/api/webhook/update-student-status
 Evento: Subscribe to list
 ```
 
@@ -50,7 +50,10 @@ Evento: Subscribe to list
 ActiveCampaign → Webhook → API Next.js → Supabase
     ↓              ↓           ↓            ↓
 Novo aluno   POST /api   Busca email   Atualiza
-em lista    webhook/ac   no banco      is_aluno
+em lista    webhook/    no banco      is_aluno
+            update-
+            student-
+            status
 ```
 
 ### Exemplo:

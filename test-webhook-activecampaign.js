@@ -7,7 +7,7 @@
  */
 
 const testWebhook = async () => {
-  const webhookUrl = 'http://localhost:3002/api/webhook/activecampaign'
+  const webhookUrl = 'http://localhost:3002/api/webhook/update-student-status'
 
   console.log('🧪 Testando webhook do ActiveCampaign...\n')
 
