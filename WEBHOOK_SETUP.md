@@ -44,6 +44,18 @@ Configure para disparar quando o contato for adicionado às listas:
 
 O endpoint identifica automaticamente qual campo atualizar baseado no **nome da lista**:
 
+### Busca de Lead (Prioridade)
+
+1. **Busca por EMAIL** (primeira tentativa)
+   - Busca exata por email no campo `email`
+   
+2. **Busca por TELEFONE** (fallback se email não encontrar)
+   - Extrai apenas dígitos do telefone
+   - Busca parcial no campo `celular`
+   - Requer mínimo de 10 dígitos
+
+### Atualização de Campos
+
 ### Lista contém "BNY" ou "BNY2"
 → Atualiza `is_aluno_bny2 = true`
 
@@ -115,9 +127,9 @@ Exemplo do que o ActiveCampaign envia:
   "contact": {
     "id": "12345",
     "email": "usuario@example.com",
+    "phone": "+5511999999999",
     "first_name": "João",
-    "last_name": "Silva",
-    "phone": "+5511999999999"
+    "last_name": "Silva"
   },
   "list": {
     "id": "1",
@@ -125,6 +137,28 @@ Exemplo do que o ActiveCampaign envia:
     "stringid": "alunos-bny2"
   }
 }
+```
+
+**Importante:** O webhook usa **email** como busca principal e **telefone** como fallback.
+
+---
+
+## Fluxo de Busca
+
+```
+📥 Webhook recebido
+    ↓
+🔍 Busca por EMAIL no Supabase
+    ↓
+✅ Encontrou? → Atualiza campos
+    ↓
+❌ Não encontrou?
+    ↓
+🔍 Busca por TELEFONE (apenas dígitos)
+    ↓
+✅ Encontrou? → Atualiza campos
+    ↓
+❌ Não encontrou? → Retorna "Lead não encontrado"
 ```
 
 ---
@@ -153,7 +187,9 @@ if (authToken !== process.env.AC_WEBHOOK_SECRET) {
 
 ### Lead não encontrado
 - ✅ Verificar se o email existe no Supabase
-- ✅ Email deve ser exatamente igual (case sensitive)
+- ✅ Verificar se o telefone existe no Supabase (fallback)
+- ✅ Email e telefone devem ser exatamente iguais ou similares
+- ✅ Telefone: apenas dígitos são comparados (mínimo 10 dígitos)
 
 ### Webhook não dispara
 - ✅ Verificar se a URL está correta e acessível

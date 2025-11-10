@@ -22,36 +22,79 @@ export async function POST(request: NextRequest) {
     }
 
     const email = contact.email
+    const phone = contact.phone
     const contactId = contact.id
 
     console.log(`📧 Processando contato: ${email} (ID: ${contactId})`)
+    if (phone) console.log(`📱 Telefone: ${phone}`)
 
-    // Buscar o lead no Supabase pelo email
-    const { data: leads, error: searchError } = await supabase
-      .from('quiz_leads')
-      .select('id, email, nome, is_aluno, is_aluno_bny2')
-      .eq('email', email)
-      .limit(1)
+    // ========================================
+    // BUSCA FLEXÍVEL: Email OU Telefone
+    // ========================================
+    let lead = null
+    let searchMethod = ''
 
-    if (searchError) {
-      console.error('❌ Erro ao buscar lead no Supabase:', searchError)
-      return NextResponse.json(
-        { error: 'Erro ao buscar lead no banco de dados' },
-        { status: 500 }
-      )
+    // Estratégia 1: Buscar por email
+    if (email) {
+      console.log('🔍 Tentativa 1: Busca por email...')
+      const { data: emailResults, error: emailError } = await supabase
+        .from('quiz_leads')
+        .select('id, email, celular, nome, is_aluno, is_aluno_bny2')
+        .ilike('email', email)
+        .limit(1)
+
+      if (emailError) {
+        console.error('❌ Erro ao buscar por email:', emailError)
+      } else if (emailResults && emailResults.length > 0) {
+        lead = emailResults[0]
+        searchMethod = 'email'
+        console.log(`✅ Lead encontrado por email: ${lead.nome}`)
+      }
     }
 
-    if (!leads || leads.length === 0) {
-      console.log(`⚠️ Lead com email ${email} não encontrado no Supabase`)
+    // Estratégia 2: Se não encontrou por email, tentar por telefone
+    if (!lead && phone) {
+      console.log('🔍 Tentativa 2: Busca por telefone...')
+      
+      // Extrair apenas dígitos do telefone
+      const phoneDigits = phone.replace(/\D/g, '')
+      
+      if (phoneDigits.length >= 10) {
+        console.log(`   📱 Buscando telefone com dígitos: ${phoneDigits}`)
+        
+        const { data: phoneResults, error: phoneError } = await supabase
+          .from('quiz_leads')
+          .select('id, email, celular, nome, is_aluno, is_aluno_bny2')
+          .ilike('celular', `%${phoneDigits}%`)
+          .limit(1)
+
+        if (phoneError) {
+          console.error('❌ Erro ao buscar por telefone:', phoneError)
+        } else if (phoneResults && phoneResults.length > 0) {
+          lead = phoneResults[0]
+          searchMethod = 'telefone'
+          console.log(`✅ Lead encontrado por telefone: ${lead.nome}`)
+        }
+      } else {
+        console.log(`⚠️ Telefone muito curto (${phoneDigits.length} dígitos), ignorando busca por telefone`)
+      }
+    }
+
+    // Se não encontrou o lead
+    if (!lead) {
+      console.log(`⚠️ Lead não encontrado no Supabase`)
+      console.log(`   Email tentado: ${email || 'N/A'}`)
+      console.log(`   Telefone tentado: ${phone || 'N/A'}`)
+      
       return NextResponse.json({
         message: 'Lead não encontrado no banco de dados',
-        email,
+        email: email || null,
+        phone: phone || null,
         action: 'ignored'
       })
     }
 
-    const lead = leads[0]
-    console.log(`✅ Lead encontrado: ${lead.nome} (${lead.email})`)
+    console.log(`✅ Lead encontrado via ${searchMethod}: ${lead.nome} (${lead.email})`)
 
     // Verificar em qual lista o contato foi adicionado
     // Lista ID pode indicar se é aluno geral ou aluno BNY2
@@ -109,8 +152,10 @@ export async function POST(request: NextRequest) {
       lead: {
         id: lead.id,
         email: lead.email,
+        celular: lead.celular,
         nome: lead.nome
       },
+      searchMethod: searchMethod, // 'email' ou 'telefone'
       updates: updateData,
       webhook_type: type,
       list: {
