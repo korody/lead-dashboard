@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Lista: ${listName} (ID: ${listId})`)
 
     // Definir quais campos atualizar baseado na lista
-    let updateData: { is_aluno?: boolean; is_aluno_bny2?: boolean } = {}
+    const updateData: { is_aluno?: boolean; is_aluno_bny2?: boolean } = {}
 
     // Você pode ajustar essas condições baseado nos IDs/nomes das suas listas no AC
     // Exemplo: Lista "Alunos Mestre Ye" -> is_aluno = true
