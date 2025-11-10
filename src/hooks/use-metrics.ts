@@ -51,11 +51,12 @@ export interface DashboardMetrics {
 async function fetchMetrics(days: number = 30): Promise<DashboardMetrics> {
   // Adiciona timestamp para evitar cache em produção
   const timestamp = new Date().getTime()
-  const response = await fetch(`/api/metrics?days=${days}&_t=${timestamp}`, {
+  const response = await fetch(`/api/metrics?days=${days}&_t=${timestamp}&_bust=${Math.random()}`, {
     cache: 'no-store',
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache'
+      'Pragma': 'no-cache',
+      'Expires': '0'
     }
   })
   if (!response.ok) {

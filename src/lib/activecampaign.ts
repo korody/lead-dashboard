@@ -3,6 +3,8 @@
  * Configuração e métodos para integração com ActiveCampaign API
  */
 
+import { ymdBRT, nowInBRT } from './utils'
+
 const AC_API_URL = process.env.ACTIVECAMPAIGN_API_URL // Ex: https://seudominio.api-us1.com
 const AC_API_KEY = process.env.ACTIVECAMPAIGN_API_KEY
 
@@ -159,12 +161,22 @@ export class ActiveCampaignClient {
         })
         
         const total150 = parseInt(data150.meta?.total || '0', 10)
+        console.log(`   📊 Página: ${fieldValues.length} fieldValues | Total no Map: ${field150Map.size}/${total150}`)
+        
         if (field150Map.size >= total150) break
         
         offset150 += limit150
       }
       
       console.log(`   ✅ ${field150Map.size} contatos com campo 150`)
+      
+      // Debug: contar quantos são de hoje
+      const hoje = ymdBRT(nowInBRT())
+      let countHoje = 0
+      field150Map.forEach((data) => {
+        if (data.startsWith(hoje)) countHoje++
+      })
+      console.log(`   📅 Contatos com data de HOJE (${hoje}): ${countHoje}`)
       
       // PASSO 2: Buscar TODOS os contatos com a tag
       let allContacts: Array<Record<string, unknown>> = []
@@ -199,12 +211,15 @@ export class ActiveCampaignClient {
       
       // console.log(`✅ ${allContacts.length} contatos carregados`)
       
-      // Filtrar e agrupar por BNY2_DATA_DO_CADASTRO ou cdate (fallback)
-      const dataLimite = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      // Filtrar e agrupar APENAS por campo 150 (BNY2 - Data do Cadastro)
+      // Calcular dataLimite em BRT (não UTC!)
+      const agora = nowInBRT()
+      const dataLimite = new Date(agora.getTime() - days * 24 * 60 * 60 * 1000)
+      console.log(`📅 Data limite: ${ymdBRT(dataLimite)} (últimos ${days} dias desde ${ymdBRT(agora)})`)
+      
       const byDay: Record<string, number> = {}
       let dentroIntervalo = 0
       let usouCustomField = 0
-      let usouCdate = 0
       let contatoIndex = 0
       
       allContacts.forEach((contact: Record<string, unknown>) => {
@@ -227,15 +242,19 @@ export class ActiveCampaignClient {
           // Parsear a data do campo customizado (formato esperado: YYYY-MM-DD)
           const valorData = valorCampo150.trim()
           
-          // Tentar diferentes formatos
+          // Tentar diferentes formatos - SEMPRE INTERPRETAR COMO BRT
           if (valorData.match(/^\d{4}-\d{2}-\d{2}/)) {
-            // Formato ISO: 2025-11-02
-            cadastroDate = new Date(valorData)
+            // Formato ISO: 2025-11-02 (tratar como data BRT, não UTC)
+            const [ano, mes, dia] = valorData.split('-').map(Number)
+            // Criar data no timezone BRT (não UTC)
+            const dataBRT = new Date(ano, mes - 1, dia, 12, 0, 0) // Meio-dia para evitar issues de timezone
+            cadastroDate = dataBRT
             usouCustomField++
           } else if (valorData.match(/^\d{2}\/\d{2}\/\d{4}/)) {
             // Formato BR: 02/11/2025
-            const [dia, mes, ano] = valorData.split('/')
-            cadastroDate = new Date(`${ano}-${mes}-${dia}`)
+            const [dia, mes, ano] = valorData.split('/').map(Number)
+            const dataBRT = new Date(ano, mes - 1, dia, 12, 0, 0)
+            cadastroDate = dataBRT
             usouCustomField++
           } else if (!isNaN(Number(valorData))) {
             // Timestamp Unix
@@ -244,32 +263,28 @@ export class ActiveCampaignClient {
           }
         }
         
-        // Fallback para cdate se não conseguiu obter do campo customizado
+        // SÓ PROCESSAR se tiver campo 150 (data real do evento BNY2)
         if (!cadastroDate || isNaN(cadastroDate.getTime())) {
-          const createRaw = (contact as { cdate?: string }).cdate
-          if (createRaw) {
-            cadastroDate = new Date(createRaw)
-            usouCdate++
-          }
+          return // Pula contatos sem campo 150
         }
         
-        if (!cadastroDate || isNaN(cadastroDate.getTime())) return
+        // Debug: Log dos primeiros contatos de hoje
+        const dia = ymdBRT(cadastroDate)
+        if (dia === hoje && dentroIntervalo < 3) {
+          console.log(`🔍 Debug contato de HOJE:`)
+          console.log(`   Data cadastro: ${cadastroDate.toISOString()} -> ${dia}`)
+          console.log(`   Data limite: ${dataLimite.toISOString()}`)
+          console.log(`   Passou filtro: ${cadastroDate >= dataLimite}`)
+        }
         
         if (cadastroDate >= dataLimite) {
-          // Converter para timezone brasileiro usando Intl.DateTimeFormat
-          const formatter = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/Sao_Paulo',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-          })
-          const dia = formatter.format(cadastroDate)
           byDay[dia] = (byDay[dia] || 0) + 1
           dentroIntervalo++
         }
       })
       
-      console.log(`✅ ${dentroIntervalo} contatos | Campo BNY2: ${usouCustomField} | Fallback cdate: ${usouCdate}`)
+      console.log(`✅ Campo 150 (BNY2): ${usouCustomField} | No intervalo dos últimos ${days} dias: ${dentroIntervalo}`)
+      console.log(`📊 Distribuição por dia:`, Object.entries(byDay).sort().map(([d, c]) => `${d}: ${c}`).join(' | '))
       
       return {
         total: dentroIntervalo,

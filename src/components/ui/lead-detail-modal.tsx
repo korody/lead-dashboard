@@ -16,6 +16,8 @@ interface Lead {
   prioridade: string
   quadrante: number
   is_hot_lead_vip: boolean
+  is_aluno?: boolean
+  is_aluno_bny2?: boolean
   whatsapp_status?: string
   status_tags?: string[]
   created_at: string
@@ -160,6 +162,16 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                           HOT VIP
                         </Badge>
                       )}
+                      {lead.is_aluno && (
+                        <Badge className="bg-gradient-to-r from-emerald-500 to-green-600 text-white border-0 shadow-lg">
+                          🎓 Aluno
+                        </Badge>
+                      )}
+                      {lead.is_aluno_bny2 && (
+                        <Badge className="bg-gradient-to-r from-black to-gray-800 text-white border-0 shadow-lg">
+                          🏆 BNY - Aluno
+                        </Badge>
+                      )}
                       <Badge className={`${getCorPrioridade(lead.prioridade)} font-semibold shadow-lg text-xs`}>
                         Prioridade {lead.prioridade.toUpperCase()}
                       </Badge>
@@ -185,6 +197,44 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
             {/* Content with dark mode styling */}
             <div className="p-6 space-y-6">
               
+              {/* Seção Aluno BNY2 - Destaque especial */}
+              {lead.is_aluno_bny2 && (
+                <div className="bg-gradient-to-br from-black/40 to-gray-900/40 border-2 border-gray-700/80 rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-black to-gray-800 flex items-center justify-center text-4xl shadow-xl ring-4 ring-gray-700/50">
+                      🏆
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                        Status: BNY - Aluno
+                      </h3>
+                      <p className="text-gray-300 text-sm">
+                        Este lead é aluno(a) do programa BNY2
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Seção Aluno - Destaque especial */}
+              {lead.is_aluno && (
+                <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 border-2 border-emerald-500/50 rounded-2xl p-5 shadow-xl">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-4xl shadow-xl ring-4 ring-emerald-400/30">
+                      🎓
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
+                        Status: Aluno
+                      </h3>
+                      <p className="text-emerald-200 text-sm">
+                        Este lead já é aluno(a) do Mestre Ye
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Contact Info - PRIORITY for sales */}
               <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl p-5 shadow-xl">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">

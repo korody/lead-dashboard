@@ -23,6 +23,8 @@ interface Lead {
   prioridade: string
   quadrante: number
   is_hot_lead_vip: boolean
+  is_aluno?: boolean
+  is_aluno_bny2?: boolean
   whatsapp_status?: string
   created_at: string
   respostas?: Record<string, string>
@@ -43,6 +45,8 @@ function LeadsPageContent() {
   const [filtroPrioridade, setFiltroPrioridade] = useState<string>(searchParams?.get('prioridade') || 'TODOS')
   const [filtroQuadrante, setFiltroQuadrante] = useState<string>(searchParams?.get('quadrante') || 'TODOS')
   const [filtroVIP, setFiltroVIP] = useState<boolean>(searchParams?.get('vip') === 'true')
+  const [filtroAluno, setFiltroAluno] = useState<string>('TODOS') // 'TODOS', 'SIM', 'NAO'
+  const [filtroAlunoBNY, setFiltroAlunoBNY] = useState<string>('TODOS') // 'TODOS', 'SIM', 'NAO'
   const [mostrarFiltros, setMostrarFiltros] = useState(false)
   const [sortField, setSortField] = useState<SortField>('lead_score')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
@@ -63,7 +67,7 @@ function LeadsPageContent() {
   useEffect(() => {
     if (!isMounted) return
     
-    const hasActiveFilters = filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP
+    const hasActiveFilters = filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP || filtroAluno !== 'TODOS' || filtroAlunoBNY !== 'TODOS'
     
     if (hasActiveFilters || searchTerm.trim() !== '') {
       const handler = setTimeout(() => {
@@ -74,33 +78,75 @@ function LeadsPageContent() {
       // No filters active, load paginated results
       carregarLeads()
     }
-  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, searchTerm, isMounted])
+  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, isMounted])
 
   const buscarComFiltros = async () => {
     try {
       setLoadingSearch(true)
+      
+      // Query para dados
       let query = supabase
         .from('quiz_leads')
         .select('*')
         .order('created_at', { ascending: false })
 
+      // Query para contagem
+      let countQuery = supabase
+        .from('quiz_leads')
+        .select('*', { count: 'exact', head: true })
+
       // Apply search term if exists
       if (searchTerm.trim() !== '') {
         const like = `%${searchTerm.trim()}%`
         query = query.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
+        countQuery = countQuery.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
       }
 
       // Apply filters
-      if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
-      if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
-      if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
-      if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
+      if (filtroElemento !== 'TODOS') {
+        query = query.eq('elemento_principal', filtroElemento)
+        countQuery = countQuery.eq('elemento_principal', filtroElemento)
+      }
+      if (filtroPrioridade !== 'TODOS') {
+        query = query.eq('prioridade', filtroPrioridade)
+        countQuery = countQuery.eq('prioridade', filtroPrioridade)
+      }
+      if (filtroQuadrante !== 'TODOS') {
+        query = query.eq('quadrante', parseInt(filtroQuadrante))
+        countQuery = countQuery.eq('quadrante', parseInt(filtroQuadrante))
+      }
+      if (filtroVIP) {
+        query = query.eq('is_hot_lead_vip', true)
+        countQuery = countQuery.eq('is_hot_lead_vip', true)
+      }
+      if (filtroAluno === 'SIM') {
+        query = query.eq('is_aluno', true)
+        countQuery = countQuery.eq('is_aluno', true)
+      }
+      if (filtroAluno === 'NAO') {
+        query = query.or('is_aluno.is.null,is_aluno.eq.false')
+        countQuery = countQuery.or('is_aluno.is.null,is_aluno.eq.false')
+      }
+      if (filtroAlunoBNY === 'SIM') {
+        query = query.eq('is_aluno_bny2', true)
+        countQuery = countQuery.eq('is_aluno_bny2', true)
+      }
+      if (filtroAlunoBNY === 'NAO') {
+        query = query.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
+        countQuery = countQuery.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
+      }
 
-      // Limit to 2000 for performance
-      const { data, error } = await query.limit(2000)
-      if (error) throw error
+      // Buscar dados e contagem em paralelo
+      const [dataResult, countResult] = await Promise.all([
+        query.limit(2000),
+        countQuery
+      ])
       
-      setLeads(data || [])
+      if (dataResult.error) throw dataResult.error
+      if (countResult.error) throw countResult.error
+      
+      setLeads(dataResult.data || [])
+      setTotalLeads(countResult.count || 0)
       setPaginaAtual(1)
       setIsSearching(true)
     } catch (err) {
@@ -193,7 +239,7 @@ function LeadsPageContent() {
   }
 
   const exportarCSV = () => {
-    const headers = ['Nome', 'Email', 'Celular', 'Elemento', 'Score', 'Prioridade', 'Quadrante', 'VIP', 'Data']
+    const headers = ['Nome', 'Email', 'Celular', 'Elemento', 'Score', 'Prioridade', 'Quadrante', 'VIP', 'Aluno', 'BNY-Aluno', 'Data']
     const rows = leadsOrdenados.map(lead => [
       lead.nome,
       lead.email,
@@ -203,6 +249,8 @@ function LeadsPageContent() {
       lead.prioridade,
       `Q${lead.quadrante}`,
       lead.is_hot_lead_vip ? 'Sim' : 'Não',
+      lead.is_aluno ? 'Sim' : 'Não',
+      lead.is_aluno_bny2 ? 'Sim' : 'Não',
   new Date(lead.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
     ])
     
@@ -251,6 +299,8 @@ function LeadsPageContent() {
     setFiltroPrioridade('TODOS')
     setFiltroQuadrante('TODOS')
     setFiltroVIP(false)
+    setFiltroAluno('TODOS')
+    setFiltroAlunoBNY('TODOS')
     window.history.replaceState({}, '', '/leads')
   }
 
@@ -354,7 +404,7 @@ function LeadsPageContent() {
                     {mostrarFiltros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
 
-                  {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP) && (
+                  {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP || filtroAluno !== 'TODOS' || filtroAlunoBNY !== 'TODOS') && (
                     <>
                       <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
                       {filtroQuadrante !== 'TODOS' && (
@@ -402,6 +452,28 @@ function LeadsPageContent() {
                           </button>
                         </Badge>
                       )}
+                      {filtroAluno !== 'TODOS' && (
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 flex items-center gap-1">
+                          🎓 {filtroAluno === 'SIM' ? 'Aluno' : 'Não é Aluno'}
+                          <button
+                            onClick={() => setFiltroAluno('TODOS')}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
+                      {filtroAlunoBNY !== 'TODOS' && (
+                        <Badge className="bg-black text-white dark:bg-gray-900 dark:text-white flex items-center gap-1">
+                          🏆 {filtroAlunoBNY === 'SIM' ? 'BNY - Aluno' : 'Não BNY'}
+                          <button
+                            onClick={() => setFiltroAlunoBNY('TODOS')}
+                            className="ml-1 hover:opacity-70"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      )}
                       <button
                         onClick={limparFiltros}
                         className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium"
@@ -414,7 +486,7 @@ function LeadsPageContent() {
 
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   {isSearching ? (
-                    <>{leadsOrdenados.length} leads encontrados</>
+                    <>{totalLeads} leads encontrados com esse filtro</>
                   ) : (
                     <>{leadsOrdenados.length} de {totalLeads} leads</>
                   )}
@@ -427,7 +499,7 @@ function LeadsPageContent() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-xl"
+                  className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-xl"
                 >
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
@@ -477,6 +549,36 @@ function LeadsPageContent() {
                       <Flame className={`w-5 h-5 inline mr-2 ${filtroVIP ? 'text-white' : 'text-orange-500'}`} />
                       {filtroVIP ? 'Apenas VIPs' : 'Todos'}
                     </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      Aluno
+                    </label>
+                    <select
+                      value={filtroAluno}
+                      onChange={(e) => setFiltroAluno(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="TODOS">Todos</option>
+                      <option value="SIM">🎓 Apenas Alunos</option>
+                      <option value="NAO">❌ Não é Aluno</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      BNY - Aluno
+                    </label>
+                    <select
+                      value={filtroAlunoBNY}
+                      onChange={(e) => setFiltroAlunoBNY(e.target.value)}
+                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="TODOS">Todos</option>
+                      <option value="SIM">🏆 Apenas BNY</option>
+                      <option value="NAO">❌ Não é BNY</option>
+                    </select>
                   </div>
 
                   <div>
@@ -588,12 +690,24 @@ function LeadsPageContent() {
                               <div className="font-semibold text-gray-900 dark:text-white">
                                 {lead.nome}
                               </div>
-                              {lead.is_hot_lead_vip && (
-                                <Badge className="mt-1 bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
-                                  <Flame className="w-3 h-3 mr-1" />
-                                  HOT VIP
-                                </Badge>
-                              )}
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {lead.is_hot_lead_vip && (
+                                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white border-0">
+                                    <Flame className="w-3 h-3 mr-1" />
+                                    HOT VIP
+                                  </Badge>
+                                )}
+                                {lead.is_aluno && (
+                                  <Badge className="bg-gradient-to-r from-emerald-500 to-green-600 text-white border-0">
+                                    🎓 Aluno
+                                  </Badge>
+                                )}
+                                {lead.is_aluno_bny2 && (
+                                  <Badge className="bg-gradient-to-r from-black to-gray-800 text-white border-0">
+                                    🏆 BNY - Aluno
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

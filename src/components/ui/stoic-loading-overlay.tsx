@@ -52,10 +52,8 @@ interface StoicLoadingOverlayProps {
 }
 
 export function StoicLoadingOverlay({ message = "Carregando insights..." }: StoicLoadingOverlayProps) {
-  // Randomiza a primeira citação no useState
-  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(() => 
-    Math.floor(Math.random() * STOIC_QUOTES.length)
-  )
+  // Sempre começa com a primeira citação (evita erro de hidratação)
+  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0)
 
   useEffect(() => {
     // Muda a citação a cada 6 segundos
