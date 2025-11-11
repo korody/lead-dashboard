@@ -4,10 +4,26 @@ import { supabase } from '@/lib/supabase'
 // Endpoint para receber webhooks do ActiveCampaign
 // URL: /api/webhook/activecampaign
 
+interface WebhookBody {
+  type?: string | null
+  contact?: {
+    id?: string | null
+    email?: string | null
+    phone?: string | null
+    first_name?: string | null
+    last_name?: string | null
+  }
+  list?: {
+    id?: string | null
+    name?: string | null
+    stringid?: string | null
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // ActiveCampaign pode enviar dados em diferentes formatos
-    let body: any
+    let body: WebhookBody
     const contentType = request.headers.get('content-type') || ''
     
     console.log('📨 Content-Type recebido:', contentType)
