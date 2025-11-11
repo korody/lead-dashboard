@@ -6,7 +6,64 @@ import { supabase } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
+    // ActiveCampaign pode enviar dados em diferentes formatos
+    let body: any
+    const contentType = request.headers.get('content-type') || ''
+    
+    console.log('📨 Content-Type recebido:', contentType)
+    
+    if (contentType.includes('application/json')) {
+      // Formato JSON
+      body = await request.json()
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Formato form-urlencoded (ActiveCampaign usa esse formato por padrão)
+      const formData = await request.text()
+      console.log('📝 Form data raw:', formData)
+      
+      // Parse dos dados do formulário
+      const params = new URLSearchParams(formData)
+      body = {
+        type: params.get('type') || params.get('contact[type]'),
+        contact: {
+          id: params.get('contact[id]'),
+          email: params.get('contact[email]'),
+          phone: params.get('contact[phone]'),
+          first_name: params.get('contact[first_name]'),
+          last_name: params.get('contact[last_name]')
+        },
+        list: {
+          id: params.get('list[id]') || params.get('list'),
+          name: params.get('list[name]'),
+          stringid: params.get('list[stringid]')
+        }
+      }
+    } else {
+      // Tentar como texto e parsear
+      const text = await request.text()
+      console.log('📝 Texto raw recebido:', text)
+      
+      try {
+        body = JSON.parse(text)
+      } catch {
+        // Se falhar, tentar como URLSearchParams
+        const params = new URLSearchParams(text)
+        body = {
+          type: params.get('type') || params.get('contact[type]'),
+          contact: {
+            id: params.get('contact[id]'),
+            email: params.get('contact[email]'),
+            phone: params.get('contact[phone]'),
+            first_name: params.get('contact[first_name]'),
+            last_name: params.get('contact[last_name]')
+          },
+          list: {
+            id: params.get('list[id]') || params.get('list'),
+            name: params.get('list[name]'),
+            stringid: params.get('list[stringid]')
+          }
+        }
+      }
+    }
     
     console.log('📥 Webhook recebido do ActiveCampaign:', JSON.stringify(body, null, 2))
 
