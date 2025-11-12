@@ -1,10 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Phone, Mail, Target, Flame, MessageCircle, Award, Clock, Tag } from "lucide-react"
+import { X, Phone, Mail, Target, Flame, MessageCircle, Award, Clock, Tag, Send, Bot, Zap, Copy, Loader2, FileText, Mic, Video, CheckSquare, AlertTriangle } from "lucide-react"
 import { Badge } from "./badge"
 import { ELEMENTOS_MTC } from "../../lib/constants"
+import { gerarScriptParaLead } from "../../lib/audio-copies"
 
 interface Lead {
   id: string
@@ -34,12 +35,42 @@ interface LeadDetailModalProps {
 }
 
 export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps) {
+  // Estados para loading e feedback
+  const [loadingAction, setLoadingAction] = useState<string | null>(null)
+  const [actionFeedback, setActionFeedback] = useState<{type: 'success' | 'error', message: string} | null>(null)
+
+  // Logs transitórios por bloco (somem automaticamente)
+  const [logsMain, setLogsMain] = useState<string[]>([])
+  const [logsScript, setLogsScript] = useState<string[]>([])
+  const logsMainTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const logsScriptTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const pushLogMain = (msg: string) => {
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false })
+    setLogsMain(prev => [...prev, `${ts} • ${msg}`])
+    if (logsMainTimer.current) clearTimeout(logsMainTimer.current)
+    logsMainTimer.current = setTimeout(() => setLogsMain([]), 7000)
+  }
+
+  const pushLogScript = (msg: string) => {
+    const ts = new Date().toLocaleTimeString('pt-BR', { hour12: false })
+    setLogsScript(prev => [...prev, `${ts} • ${msg}`])
+    if (logsScriptTimer.current) clearTimeout(logsScriptTimer.current)
+    logsScriptTimer.current = setTimeout(() => setLogsScript([]), 7000)
+  }
+
   // Calcular dias no sistema usando useMemo (MUST be before early return)
   const diasNoSistema = useMemo(() => {
     if (!lead) return 0
     const now = new Date().getTime()
     const createdAt = new Date(lead.created_at).getTime()
     return Math.floor((now - createdAt) / (1000 * 60 * 60 * 24))
+  }, [lead])
+
+  // Gerar script personalizado baseado em is_aluno
+  const scriptPersonalizado = useMemo(() => {
+    if (!lead) return { script: '', scriptType: '' }
+    return gerarScriptParaLead(lead)
   }, [lead])
 
   if (!lead) return null
@@ -51,6 +82,258 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
   }
 
   const referralLink = generateReferralLink()
+
+  // Funções de ação WhatsApp
+  const handleSendDiagnostico = async () => {
+    setLoadingAction('diagnostico')
+    setActionFeedback(null)
+    setLogsMain([])
+    pushLogMain('Iniciando envio do diagnóstico...')
+    
+    try {
+      pushLogMain('Chamando /api/whatsapp/send (sendDiagnostico=true)')
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          sendDiagnostico: true
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        pushLogMain(data.simulation ? 'Simulação ativada' : 'Execução real')
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? '✅ Simulação: Diagnóstico seria enviado' 
+            : '✅ Diagnóstico enviado com sucesso!'
+        })
+        pushLogMain('Diagnóstico enviado com sucesso')
+      } else {
+        setActionFeedback({ type: 'error', message: '❌ Erro ao enviar diagnóstico' })
+        pushLogMain('Falha ao enviar diagnóstico')
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+      pushLogMain('Erro de rede/requisição')
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+      pushLogMain('Finalizado')
+    }
+  }
+
+  const handleTriggerAutomation = async () => {
+    setLoadingAction('automation')
+    setActionFeedback(null)
+    setLogsMain([])
+    pushLogMain('Iniciando inserção na automação...')
+    
+    try {
+      pushLogMain('Chamando /api/whatsapp/trigger-automation')
+      const response = await fetch('/api/whatsapp/trigger-automation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        pushLogMain(data.simulation ? 'Simulação ativada' : 'Execução real')
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? '✅ Simulação: Automação seria disparada' 
+            : '✅ Automação iniciada com sucesso!'
+        })
+        pushLogMain('Lead inserido na automação com sucesso')
+      } else {
+        setActionFeedback({ type: 'error', message: '❌ Erro ao disparar automação' })
+        pushLogMain('Falha ao inserir lead na automação')
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+      pushLogMain('Erro de rede/requisição')
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+      pushLogMain('Finalizado')
+    }
+  }
+
+  const handleSendChallenge = async () => {
+    setLoadingAction('challenge')
+    setActionFeedback(null)
+    
+    try {
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          sendChallenge: true
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? '✅ Simulação: Desafio seria enviado' 
+            : '✅ Desafio enviado com sucesso!'
+        })
+      } else {
+        setActionFeedback({ type: 'error', message: '❌ Erro ao enviar desafio' })
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+    }
+  }
+
+  const handleCopyText = () => {
+    const texto = lead.diagnostico_completo || lead.script_abertura || 'Diagnóstico não disponível'
+    navigator.clipboard.writeText(texto)
+    setActionFeedback({ type: 'success', message: '✅ Texto copiado!' })
+    setTimeout(() => setActionFeedback(null), 3000)
+  }
+
+  const handleSendScriptText = async () => {
+    setLoadingAction('script_text')
+    setActionFeedback(null)
+    setLogsScript([])
+    pushLogScript('Preparando envio do script como texto...')
+    
+    try {
+      pushLogScript('Chamando /api/whatsapp/send (scriptType=text)')
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          sendScript: true,
+          scriptType: 'text'
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        pushLogScript(data.simulation ? 'Simulação ativada' : 'Execução real')
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? '✅ Simulação: Script seria enviado como texto' 
+            : '✅ Script enviado como texto!'
+        })
+        pushLogScript('Script enviado como texto com sucesso')
+      } else {
+        setActionFeedback({ type: 'error', message: '❌ Erro ao enviar script' })
+        pushLogScript('Falha ao enviar script como texto')
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+      pushLogScript('Erro de rede/requisição')
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+      pushLogScript('Finalizado')
+    }
+  }
+
+  const handleSendScriptAudio = async () => {
+    setLoadingAction('script_audio')
+    setActionFeedback(null)
+    setLogsScript([])
+    pushLogScript('Gerando áudio personalizado via ElevenLabs...')
+    
+    try {
+      pushLogScript('Chamando /api/audio-personalizado/enviar')
+      const response = await fetch('/api/audio-personalizado/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        pushLogScript(data.simulation ? 'Simulação ativada' : 'Execução real')
+        if (data.scriptType) pushLogScript(`Tipo de script: ${data.scriptType}`)
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? `✅ Simulação: Áudio seria gerado (${data.scriptType})` 
+            : `✅ Áudio gerado e enviado! (${data.scriptType})`
+        })
+        pushLogScript('Upload para o Supabase concluído')
+        pushLogScript('Automação do WhatsApp disparada com link do áudio')
+      } else {
+        setActionFeedback({ type: 'error', message: `❌ Erro: ${data.error}` })
+        pushLogScript('Falha ao gerar/enviar áudio')
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+      pushLogScript('Erro de rede/requisição')
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+      pushLogScript('Finalizado')
+    }
+  }
+
+  const handleSendScriptVideo = async () => {
+    setLoadingAction('script_video')
+    setActionFeedback(null)
+    setLogsScript([])
+    pushLogScript('Preparando envio do script como vídeo...')
+    
+    try {
+      pushLogScript('Chamando /api/whatsapp/send (scriptType=video)')
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          sendScript: true,
+          scriptType: 'video'
+        })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        pushLogScript(data.simulation ? 'Simulação ativada' : 'Execução real')
+        setActionFeedback({
+          type: 'success',
+          message: data.simulation 
+            ? '✅ Simulação: Script seria enviado como vídeo' 
+            : '✅ Script enviado como vídeo!'
+        })
+        pushLogScript('Script enviado como vídeo com sucesso')
+      } else {
+        setActionFeedback({ type: 'error', message: '❌ Erro ao enviar script' })
+        pushLogScript('Falha ao enviar script como vídeo')
+      }
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: '❌ Erro na requisição' })
+      pushLogScript('Erro de rede/requisição')
+    } finally {
+      setLoadingAction(null)
+      setTimeout(() => setActionFeedback(null), 5000)
+      pushLogScript('Finalizado')
+    }
+  }
 
   const getIconeElemento = (elemento: string) => {
     return ELEMENTOS_MTC[elemento as keyof typeof ELEMENTOS_MTC]?.emoji || '⚪'
@@ -197,44 +480,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
             {/* Content with dark mode styling */}
             <div className="p-6 space-y-6">
               
-              {/* Seção Aluno BNY2 - Destaque especial */}
-              {lead.is_aluno_bny2 && (
-                <div className="bg-gradient-to-br from-black/40 to-gray-900/40 border-2 border-gray-700/80 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-black to-gray-800 flex items-center justify-center text-4xl shadow-xl ring-4 ring-gray-700/50">
-                      🏆
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                        Status: BNY - Aluno
-                      </h3>
-                      <p className="text-gray-300 text-sm">
-                        Este lead é aluno(a) do programa BNY2
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Seção Aluno - Destaque especial */}
-              {lead.is_aluno && (
-                <div className="bg-gradient-to-br from-emerald-500/20 to-green-500/20 border-2 border-emerald-500/50 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center text-4xl shadow-xl ring-4 ring-emerald-400/30">
-                      🎓
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                        Status: Aluno
-                      </h3>
-                      <p className="text-emerald-200 text-sm">
-                        Este lead já é aluno(a) do Mestre Ye
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Contact Info - PRIORITY for sales */}
               <div className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-2 border-indigo-500/30 rounded-2xl p-5 shadow-xl">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -310,38 +555,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   </p>
                 </div>
               </div>
-
-              {/* Script de Abertura */}
-              {lead.script_abertura && (
-                <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-2 border-cyan-500/30 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <MessageCircle className="w-5 h-5 text-cyan-400" />
-                      Script de Abertura
-                    </h3>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(lead.script_abertura || '')
-                        // Você pode adicionar um toast notification aqui se quiser
-                      }}
-                      className="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg border border-cyan-500/40 transition-all text-sm font-semibold flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copiar
-                    </button>
-                  </div>
-                  <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
-                    <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
-                      {lead.script_abertura}
-                    </p>
-                  </div>
-                  <div className="mt-3 text-xs text-cyan-400/80 text-center">
-                    💡 Use este script como base para iniciar a conversa com o lead
-                  </div>
-                </div>
-              )}
 
               {/* Perfil de Marketing */}
               {lead.respostas && (lead.respostas.P11 || lead.respostas.P12 || lead.respostas.P13) && (
@@ -440,13 +653,228 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                       Copiar
                     </button>
                   </div>
-                  <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50">
+                  <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50 max-h-96 overflow-y-auto">
                     <p className="text-gray-200 whitespace-pre-wrap leading-relaxed text-sm">
                       {lead.diagnostico_completo}
                     </p>
                   </div>
                   <div className="mt-3 text-xs text-purple-400/80 text-center">
                     📋 Envie o diagnóstico completo caso o lead precise receber novamente
+                  </div>
+                </div>
+              )}
+
+              {/* Ações WhatsApp - Nova seção */}
+              <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 rounded-2xl p-6 shadow-xl">
+                <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-green-400" />
+                  Ações de WhatsApp
+                  {process.env.NODE_ENV !== 'production' && (
+                    <span className="ml-auto px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/40">
+                      🧪 Modo Simulação
+                    </span>
+                  )}
+                </h3>
+
+
+                <div className="space-y-3">
+                  {/* Botão 1: Enviar Diagnóstico */}
+                  <button
+                    onClick={handleSendDiagnostico}
+                    disabled={loadingAction !== null}
+                    className="w-full p-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loadingAction === 'diagnostico' ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
+                    ) : (
+                      <><Send className="w-5 h-5" /> Enviar Diagnóstico direto (janela aberta)</>
+                    )}
+                  </button>
+
+                  {/* Botão 2: Acionar Automação */}
+                  <button
+                    onClick={handleTriggerAutomation}
+                    disabled={loadingAction !== null}
+                    className="w-full p-4 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loadingAction === 'automation' ? (
+                      <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
+                    ) : (
+                      <><Bot className="w-5 h-5" /> Inserir na Automação (janela fechada)</>
+                    )}
+                  </button>
+                  {/* Painel de Logs (movido para baixo) */}
+                  {logsMain.length > 0 && (
+                    <div className="bg-black/40 border border-green-500/30 rounded-lg p-3 max-h-40 overflow-y-auto text-xs font-mono space-y-1">
+                      {logsMain.map((l, i) => (
+                        <div key={i} className="text-green-300/80 flex items-start">
+                          <span className="mr-2">▹</span>
+                          <span>{l}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Feedback de ação (agora abaixo dos logs) */}
+                  {actionFeedback && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className={`mt-3 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow ${
+                        actionFeedback.type === 'success'
+                          ? 'bg-green-900/40 border-green-500/40 text-green-300'
+                          : 'bg-red-900/40 border-red-500/40 text-red-300'
+                      }`}
+                    >
+                      {actionFeedback.type === 'success' ? (
+                        <CheckSquare className="w-4 h-4 flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                      )}
+                      <span>{actionFeedback.message}</span>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Nota explicativa */}
+                <div className="mt-4 p-3 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                  <p className="text-xs text-gray-400 text-center leading-relaxed">
+                    💡 <strong>Diagnóstico:</strong> Envia o texto completo • 
+                    <strong> Automação:</strong> Gera áudio personalizado
+                  </p>
+                </div>
+              </div>
+
+              {/* Script de Abertura Personalizado */}
+              <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border-2 border-cyan-500/30 rounded-2xl p-5 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-cyan-400" />
+                    Script Personalizado
+                    <span className="ml-2 px-2 py-1 text-xs rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                      {scriptPersonalizado.scriptType}
+                    </span>
+                  </h3>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(scriptPersonalizado.script)
+                      setActionFeedback({ type: 'success', message: '✅ Script copiado!' })
+                      setTimeout(() => setActionFeedback(null), 3000)
+                    }}
+                    className="px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 rounded-lg border border-cyan-500/40 transition-all text-sm font-semibold flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Copiar
+                  </button>
+                </div>
+                <div className="bg-gray-800/60 rounded-xl p-4 border border-gray-700/50 max-h-96 overflow-y-auto">
+                  <p className="text-gray-200 whitespace-pre-wrap leading-relaxed">
+                    {scriptPersonalizado.script}
+                  </p>
+                </div>
+                <div className="mt-3 p-3 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                  <p className="text-xs text-cyan-400/80 text-center">
+                    💡 Script gerado automaticamente baseado em: <strong>Elemento {lead.elemento_principal}</strong> • 
+                    <strong> {scriptPersonalizado.scriptType === 'ALUNO' ? 'Copy de Reativação' : 'Copy de Vendas'}</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Ações de Envio do Script */}
+              {lead.script_abertura && (
+                <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border-2 border-green-500/30 rounded-2xl p-6 shadow-xl">
+                  <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
+                    <MessageCircle className="w-5 h-5 text-green-400" />
+                    Ações de WhatsApp
+                    {process.env.NODE_ENV !== 'production' && (
+                      <span className="ml-auto px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/40">
+                        🧪 Modo Simulação
+                      </span>
+                    )}
+                  </h3>
+
+
+                  <div className="space-y-3">
+                    {/* Botão 1: Enviar como Texto */}
+                    <button
+                      onClick={handleSendScriptText}
+                      disabled={loadingAction !== null}
+                      className="w-full p-4 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loadingAction === 'script_text' ? (
+                        <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
+                      ) : (
+                        <><FileText className="w-5 h-5" /> Enviar Script por Texto</>
+                      )}
+                    </button>
+
+                    {/* Botão 2: Enviar como Áudio */}
+                    <button
+                      onClick={handleSendScriptAudio}
+                      disabled={loadingAction !== null}
+                      className="w-full p-4 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loadingAction === 'script_audio' ? (
+                        <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
+                      ) : (
+                        <><Mic className="w-5 h-5" /> Enviar Script por Áudio</>
+                      )}
+                    </button>
+
+                    {/* Botão 3: Enviar como Vídeo */}
+                    <button
+                      onClick={handleSendScriptVideo}
+                      disabled={loadingAction !== null}
+                      className="w-full p-4 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loadingAction === 'script_video' ? (
+                        <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
+                      ) : (
+                        <><Video className="w-5 h-5" /> Enviar Script por Vídeo</>
+                      )}
+                    </button>
+                    {/* Painel de Logs (movido para baixo) */}
+                    {logsScript.length > 0 && (
+                      <div className="bg-black/40 border border-cyan-500/30 rounded-lg p-3 max-h-40 overflow-y-auto text-xs font-mono space-y-1">
+                        {logsScript.map((l, i) => (
+                          <div key={i} className="text-cyan-300/80 flex items-start">
+                            <span className="mr-2">▹</span>
+                            <span>{l}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Feedback de ação (abaixo dos logs na seção de script) */}
+                    {actionFeedback && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                        className={`mt-3 flex items-center gap-3 rounded-lg border px-4 py-3 text-sm font-medium shadow ${
+                          actionFeedback.type === 'success'
+                            ? 'bg-green-900/40 border-green-500/40 text-green-300'
+                            : 'bg-red-900/40 border-red-500/40 text-red-300'
+                        }`}
+                      >
+                        {actionFeedback.type === 'success' ? (
+                          <CheckSquare className="w-4 h-4 flex-shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                        )}
+                        <span>{actionFeedback.message}</span>
+                      </motion.div>
+                    )}
+                  </div>
+
+                  {/* Nota explicativa */}
+                  <div className="mt-4 p-3 bg-gray-800/40 rounded-lg border border-gray-700/30">
+                    <p className="text-xs text-gray-400 text-center leading-relaxed">
+                      💡 <strong>Texto:</strong> Mensagem simples • 
+                      <strong> Áudio:</strong> Gera áudio com IA • 
+                      <strong> Vídeo:</strong> Avatar falando o script
+                    </p>
                   </div>
                 </div>
               )}
