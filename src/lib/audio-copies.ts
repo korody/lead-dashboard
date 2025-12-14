@@ -82,11 +82,13 @@ function copyAlunos(
 
 Como você já confiou no meu trabalho no passado, decidi dedicar um tempo para analisar seu diagnóstico hoje e notei alguns sinais de desequilíbrio em ${elementoFalado}.
 
-Provavelmente você tem sentido ${sintomas}.
+Com isso, provavelmente você sente ${sintomas}.
 
-E sei exatamente como ${solucao} — porque você já viu meu método funcionar antes.
+Mas, se você tem pratica regularmente meus exercícios, já deve ter sentido ${solucao}.
 
-${primeiroNome}, preparei uma condição exclusiva para alunos e ex-alunos aproveitarem o SUPER COMBO VITALÍCIO.
+${primeiroNome} você sabe que meu método funciona.
+
+E eu preparei uma condição realmente imperdível para alunos e ex-alunos aproveitarem o SUPER COMBO VITALÍCIO.
 
 É a mesma transformação que você já conhece, só que agora com acesso PERMANENTE a tudo que você precisa para manter os resultados para sempre.
 
@@ -98,7 +100,7 @@ Se faz sentido pra você garantir esse acesso agora, clica no link que vou te ma
 
 A minha equipe tá fechando as vagas em breve porque já estamos no limite.
 
-Posso contar com você nessa turma?`
+Posso contar com você nessa turma, ${primeiroNome}?`
 }
 
 /**

@@ -35,9 +35,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verificar modo de simulação
-    const isSimulation = process.env.NODE_ENV !== 'production' || 
-                         process.env.WHATSAPP_SIMULATION_MODE === 'true'
+    // Verificar modo de simulação (respeita a variável de ambiente explícita)
+    const isSimulation = process.env.WHATSAPP_SIMULATION_MODE === 'true'
 
     // Selecionar copy baseado em is_aluno
     const isAluno = lead.is_aluno || lead.is_aluno_bny2

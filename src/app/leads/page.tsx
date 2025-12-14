@@ -61,7 +61,44 @@ function LeadsPageContent() {
     setIsMounted(true)
     carregarLeads()
     buscarTotalSupabase()
+    
+    // Verifica se há um leadId na URL e abre o modal
+    const leadId = searchParams?.get('leadId')
+    if (leadId) {
+      carregarLeadPorId(leadId)
+    }
   }, [])
+
+  // Detecta mudanças na URL (navegação com botões do navegador)
+  useEffect(() => {
+    if (!isMounted) return
+    
+    const leadId = searchParams?.get('leadId')
+    if (leadId && (!selectedLead || selectedLead.id !== leadId)) {
+      carregarLeadPorId(leadId)
+    } else if (!leadId && isModalOpen) {
+      setIsModalOpen(false)
+      setTimeout(() => setSelectedLead(null), 300)
+    }
+  }, [searchParams])
+
+  const carregarLeadPorId = async (leadId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('quiz_leads')
+        .select('*')
+        .eq('id', leadId)
+        .single()
+      
+      if (error) throw error
+      if (data) {
+        setSelectedLead(data)
+        setIsModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar lead por ID:', error)
+    }
+  }
 
   // Watch for filter changes and trigger server-side search
   useEffect(() => {
@@ -307,10 +344,14 @@ function LeadsPageContent() {
   const handleLeadClick = (lead: Lead) => {
     setSelectedLead(lead)
     setIsModalOpen(true)
+    // Atualiza a URL com o leadId
+    window.history.pushState({}, '', `/leads?leadId=${lead.id}`)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
+    // Remove o leadId da URL
+    window.history.pushState({}, '', '/leads')
     // Small delay before clearing to allow exit animation
     setTimeout(() => setSelectedLead(null), 300)
   }

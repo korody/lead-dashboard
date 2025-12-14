@@ -117,7 +117,7 @@ export async function GET(request: Request) {
     while (true) {
       let query = supabase
         .from('quiz_leads')
-        .select('lead_score, whatsapp_status, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, quadrante')
+        .select('lead_score, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, quadrante')
         .order('id', { ascending: true })
         .range(start, start + batchSize - 1)
       
@@ -180,7 +180,7 @@ export async function GET(request: Request) {
     const statusTagCount: Record<string, number> = {}
     allLeads.forEach(l => {
       // suportar diferentes nomes e formatos
-      const raw = l.status_tags ?? l.whatsapp_status ?? ''
+      const raw = l.status_tags ?? ''
 
       let tags: string[] = []
       if (Array.isArray(raw)) {
@@ -212,12 +212,13 @@ export async function GET(request: Request) {
       })
       .sort((a, b) => b.count - a.count)
 
-    // manter métrica de sucesso baseada em whatsapp_status original (se aplicável)
-    const whatsappSent = allLeads.filter(l => 
-      l.whatsapp_status === 'sent' || 
-      l.whatsapp_status === 'resultados_enviados' ||
-      l.whatsapp_status === 'desafio_enviado'
-    ).length || 0
+    // manter métrica de sucesso baseada em status_tags
+    const whatsappSent = allLeads.filter(l => {
+      const tags = Array.isArray(l.status_tags) ? l.status_tags : []
+      return tags.some((tag: string) => 
+        ['sent', 'resultados_enviados', 'desafio_enviado', 'RESULTADOS_ENVIADOS', 'DESAFIO_ENVIADO'].includes(tag)
+      )
+    }).length || 0
     const whatsappSuccess = allLeads.length > 0 
       ? (whatsappSent / allLeads.length * 100) 
       : 0

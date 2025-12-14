@@ -59,6 +59,14 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
     logsScriptTimer.current = setTimeout(() => setLogsScript([]), 7000)
   }
 
+  const handleCopyLeadLink = () => {
+    if (!lead) return
+    const url = `${window.location.origin}/leads?leadId=${lead.id}`
+    navigator.clipboard.writeText(url)
+    setActionFeedback({ type: 'success', message: '🔗 Link do lead copiado!' })
+    setTimeout(() => setActionFeedback(null), 3000)
+  }
+
   // Calcular dias no sistema usando useMemo (MUST be before early return)
   const diasNoSistema = useMemo(() => {
     if (!lead) return 0
@@ -468,12 +476,21 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 text-white shrink-0"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleCopyLeadLink}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 text-white"
+                    title="Copiar link do lead"
+                  >
+                    <Copy className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={onClose}
+                    className="p-2 hover:bg-white/20 rounded-lg transition-all duration-200 text-white"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -669,11 +686,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                 <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-green-400" />
                   Ações de WhatsApp
-                  {process.env.NODE_ENV !== 'production' && (
-                    <span className="ml-auto px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/40">
-                      🧪 Modo Simulação
-                    </span>
-                  )}
                 </h3>
 
 
@@ -687,7 +699,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                     {loadingAction === 'diagnostico' ? (
                       <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
                     ) : (
-                      <><Send className="w-5 h-5" /> Enviar Diagnóstico direto (janela aberta)</>
+                      <><Send className="w-5 h-5" /> Enviar Diagnóstico (janela aberta)</>
                     )}
                   </button>
 
@@ -739,8 +751,8 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                 {/* Nota explicativa */}
                 <div className="mt-4 p-3 bg-gray-800/40 rounded-lg border border-gray-700/30">
                   <p className="text-xs text-gray-400 text-center leading-relaxed">
-                    💡 <strong>Diagnóstico:</strong> Envia o texto completo • 
-                    <strong> Automação:</strong> Gera áudio personalizado
+                    💡 <strong>Diagnóstico:</strong> Envia texto completo • 
+                    <strong> Automação:</strong> Inicia fluxo automatizado
                   </p>
                 </div>
               </div>
@@ -788,11 +800,6 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
                     <MessageCircle className="w-5 h-5 text-green-400" />
                     Ações de WhatsApp
-                    {process.env.NODE_ENV !== 'production' && (
-                      <span className="ml-auto px-3 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full border border-blue-500/40">
-                        🧪 Modo Simulação
-                      </span>
-                    )}
                   </h3>
 
 
@@ -810,7 +817,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                       )}
                     </button>
 
-                    {/* Botão 2: Enviar como Áudio */}
+                    {/* Botão 2: Enviar como Áudio (via Automação) */}
                     <button
                       onClick={handleSendScriptAudio}
                       disabled={loadingAction !== null}
@@ -819,7 +826,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                       {loadingAction === 'script_audio' ? (
                         <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</>
                       ) : (
-                        <><Mic className="w-5 h-5" /> Enviar Script por Áudio</>
+                        <><Mic className="w-5 h-5" /> Enviar Script por Áudio (via Automação)</>
                       )}
                     </button>
 
@@ -872,7 +879,7 @@ export function LeadDetailModal({ lead, isOpen, onClose }: LeadDetailModalProps)
                   <div className="mt-4 p-3 bg-gray-800/40 rounded-lg border border-gray-700/30">
                     <p className="text-xs text-gray-400 text-center leading-relaxed">
                       💡 <strong>Texto:</strong> Mensagem simples • 
-                      <strong> Áudio:</strong> Gera áudio com IA • 
+                      <strong> Áudio:</strong> Via fluxo automatizado com IA • 
                       <strong> Vídeo:</strong> Avatar falando o script
                     </p>
                   </div>
