@@ -105,7 +105,7 @@ export function Navigation({ children }: NavigationProps) {
                 className="flex items-center justify-center"
               >
                 <img
-                  src="/logo mestre ye.png"
+                  src="/logo%20mestre%20ye.png"
                   alt="Logo Mestre Ye"
                   className="w-full h-auto max-w-[180px] object-contain"
                 />
