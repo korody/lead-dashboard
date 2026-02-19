@@ -38,7 +38,8 @@ export default function HomePage() {
   const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(
     selectedDays,
     campaignStart,
-    campaignEnd
+    campaignEnd,
+    selectedCampaign?.utm_campaign ?? undefined
   )
   const { setControls } = useSidebarControls()
 

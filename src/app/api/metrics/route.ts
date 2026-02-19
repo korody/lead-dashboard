@@ -35,49 +35,34 @@ export async function GET(request: Request) {
   const days = isNaN(requestedDays) ? 30 : requestedDays
   const startDateParam = searchParams.get('startDate') // YYYY-MM-DD or null
   const endDateParam = searchParams.get('endDate') // YYYY-MM-DD or null
+  const utmCampaignParam = searchParams.get('utmCampaign') // ex: 'qgs1', 'bny2'
   try {
     // console.log('Starting metrics fetch...')
     
 
-    // Buscar dados do ActiveCampaign e SendFlow em paralelo
-    const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
-    // console.log('ActiveCampaign Tag ID:', acTagId)
-    const acTest = await activeCampaignClient.getTotalContactsByTag(acTagId)
-    // console.log('ActiveCampaign getTotalContactsByTag(acTagId) retornou:', acTest)
     const sendFlowCampaignId = process.env.SENDFLOW_CAMPAIGN_ID || 'wg2d0SAmMwoRt0kBOVG'
+    const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
 
-    // Pega o total de leads do ActiveCampaign
-    const acPromise = activeCampaignClient.getTotalContactsByTag(acTagId).catch(error => {
-      console.error('ActiveCampaign fetch error:', error)
-      return 0 // Fallback to 0 if error
-    })
-
-    const sendFlowPromise = sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(error => {
-      console.error('SendFlow fetch error:', error)
-      return 0 // Fallback to 0 if error
-    })
-    
-    // If we have no leads, return mock data with a note
-    // ...existing code...
-    // Mover verificação para depois da atribuição
-    
     let totalLeadsAC = 0;
     let totalGruposWhatsApp = 0;
-    
-    // Buscar dados externos em paralelo
-    // console.log('🔄 Fetching external APIs...')
-    const [ac, grupos] = await Promise.all([
-      acPromise,
-      sendFlowPromise
-    ])
-    totalLeadsAC = ac;
-    totalGruposWhatsApp = grupos;
-    // console.log(`✅ ActiveCampaign total: ${totalLeadsAC}`)
-    // console.log(`✅ SendFlow total: ${totalGruposWhatsApp}`)
-    
-    // Após verificação, atribuir valor de acTest se for válido (fallback)
-    if (acTest && typeof acTest === 'number' && acTest > 0 && totalLeadsAC === 0) {
-      totalLeadsAC = acTest;
+
+    // Quando há filtro de UTM, pula a chamada lenta do ActiveCampaign
+    // (o total virá do count do Supabase filtrado por utm_campaign)
+    if (!utmCampaignParam) {
+      const acPromise = activeCampaignClient.getTotalContactsByTag(acTagId).catch(error => {
+        console.error('ActiveCampaign fetch error:', error)
+        return 0
+      })
+      const sendFlowPromise = sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(error => {
+        console.error('SendFlow fetch error:', error)
+        return 0
+      })
+      const [ac, grupos] = await Promise.all([acPromise, sendFlowPromise])
+      totalLeadsAC = ac
+      totalGruposWhatsApp = grupos
+    } else {
+      // Quando filtro UTM ativo, só busca SendFlow
+      totalGruposWhatsApp = await sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(() => 0)
     }
     
   // Calcular data de corte baseada no período selecionado (timezone Brasil)
@@ -108,7 +93,7 @@ export async function GET(request: Request) {
     
     // console.log(`🔍 Filtrando leads desde ${cutoffIso} (${cutoffIso === null ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
     
-    // Buscar count total primeiro (filtrado por período ou tudo)
+    // Buscar count total primeiro (filtrado por período e/ou utm_campaign)
     let countQuery = supabase
       .from('quiz_leads')
       .select('*', { count: 'exact', head: true })
@@ -119,8 +104,16 @@ export async function GET(request: Request) {
     if (endCutoffIso) {
       countQuery = countQuery.lte('created_at', endCutoffIso)
     }
+    if (utmCampaignParam) {
+      countQuery = countQuery.ilike('utm_campaign', utmCampaignParam)
+    }
 
   const { count: totalCount } = await countQuery
+
+  // Quando filtro UTM ativo, o total de leads vem do Supabase (não do ActiveCampaign)
+  if (utmCampaignParam) {
+    totalLeadsAC = totalCount ?? 0
+  }
     
     // console.log(`📊 Total de leads no Supabase: ${totalCount}`)
     
@@ -144,6 +137,9 @@ export async function GET(request: Request) {
       }
       if (endCutoffIso) {
         query = query.lte('created_at', endCutoffIso)
+      }
+      if (utmCampaignParam) {
+        query = query.ilike('utm_campaign', utmCampaignParam)
       }
       
       const { data, error } = await query
@@ -280,9 +276,10 @@ export async function GET(request: Request) {
     // PRIORIDADE: Usar dados do ActiveCampaign se configurado, senão usar Supabase
     async function calcularEvolucaoTemporal() {
       const numDays = days >= 9999 ? 365 : days // Limitar "Todo o Tempo" a 1 ano de visualização
-      
+
       // Tentar buscar do ActiveCampaign primeiro (usando updated_date)
-      if (activeCampaignClient.isConfigured()) {
+      // Pula se utm_campaign está ativo (AC não suporta filtro por UTM)
+      if (!utmCampaignParam && activeCampaignClient.isConfigured()) {
         try {
           console.log('📊 Buscando evolução temporal do ActiveCampaign (via updated_date)...')
           const { byDay } = await activeCampaignClient.getRecentContactsByTag(acTagId, numDays)
@@ -322,18 +319,28 @@ export async function GET(request: Request) {
         }
       }
       
-      // Fallback: Buscar do Supabase
+      // Fallback: Buscar do Supabase (também usado quando utm_campaign está ativo)
       console.log('📊 Buscando evolução temporal do Supabase...')
       let allData: Array<Record<string, unknown>> = []
       let start = 0
       const batchSize = 1000
-      
+
       while (true) {
-        const { data, error } = await supabase
+        let supaQuery = supabase
           .from('quiz_leads')
           .select('created_at')
           .order('created_at', { ascending: true })
           .range(start, start + batchSize - 1)
+        if (utmCampaignParam) {
+          supaQuery = supaQuery.ilike('utm_campaign', utmCampaignParam)
+        }
+        if (cutoffIso) {
+          supaQuery = supaQuery.gte('created_at', cutoffIso)
+        }
+        if (endCutoffIso) {
+          supaQuery = supaQuery.lte('created_at', endCutoffIso)
+        }
+        const { data, error } = await supaQuery
         
         if (error) {
           console.error('Erro ao buscar dados para evolução temporal:', error)
@@ -523,7 +530,8 @@ export async function GET(request: Request) {
     })
     
     // Funil de conversão completo e detalhado (3 etapas)
-    if (!totalLeadsAC || totalLeadsAC === 0) {
+    // Só retorna mock quando não há dados E não há filtro UTM ativo
+    if (!utmCampaignParam && (!totalLeadsAC || totalLeadsAC === 0)) {
       console.log('No leads found, returning mock data')
       return NextResponse.json({
         success: true,

@@ -51,7 +51,8 @@ export interface DashboardMetrics {
 async function fetchMetrics(
   days: number = 30,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  utmCampaign?: string
 ): Promise<DashboardMetrics> {
   // Adiciona timestamp para evitar cache em produção
   const timestamp = new Date().getTime()
@@ -59,6 +60,7 @@ async function fetchMetrics(
   params.set('days', String(days))
   if (startDate) params.set('startDate', startDate)
   if (endDate) params.set('endDate', endDate)
+  if (utmCampaign) params.set('utmCampaign', utmCampaign)
   params.set('_t', String(timestamp))
   params.set('_bust', String(Math.random()))
 
@@ -80,14 +82,15 @@ async function fetchMetrics(
 export function useMetrics(
   days: number = 30,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  utmCampaign?: string
 ) {
   const queryClient = useQueryClient()
   const { isRealTimeEnabled } = useDashboardStore()
 
   const query = useQuery({
-    queryKey: ['metrics', days, startDate, endDate],
-    queryFn: () => fetchMetrics(days, startDate, endDate),
+    queryKey: ['metrics', days, startDate, endDate, utmCampaign],
+    queryFn: () => fetchMetrics(days, startDate, endDate, utmCampaign),
     staleTime: isRealTimeEnabled ? 30 * 1000 : 5 * 60 * 1000, // 30s if real-time, 5min otherwise
     refetchInterval: isRealTimeEnabled ? 60 * 1000 : false, // 1min if real-time enabled
     retry: 3,
@@ -98,7 +101,7 @@ export function useMetrics(
   useEffect(() => {
     if (query.data && !query.isLoading && !query.isError) {
       // Detect significant changes
-      const previousData = queryClient.getQueryData(['metrics', days, startDate, endDate]) as DashboardMetrics | undefined
+      const previousData = queryClient.getQueryData(['metrics', days, startDate, endDate, utmCampaign]) as DashboardMetrics | undefined
       if (previousData && query.data.totalLeads > previousData.totalLeads) {
         const newLeads = query.data.totalLeads - previousData.totalLeads
         toast.success(`🚀 ${newLeads} novo(s) cadastro(s) detectado(s)!`, {
@@ -115,7 +118,7 @@ export function useMetrics(
         })
       }
     }
-  }, [query.data, queryClient, days, startDate, endDate])
+  }, [query.data, queryClient, days, startDate, endDate, utmCampaign])
 
   // Show error toast
   useEffect(() => {
@@ -130,7 +133,7 @@ export function useMetrics(
   return {
     ...query,
     refresh: () => {
-      queryClient.invalidateQueries({ queryKey: ['metrics', days, startDate, endDate] })
+      queryClient.invalidateQueries({ queryKey: ['metrics', days, startDate, endDate, utmCampaign] })
       toast.loading('Atualizando dados...', { duration: 2000 })
     }
   }
@@ -139,10 +142,11 @@ export function useMetrics(
 export function useRealTimeMetrics(
   days: number = 30,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  utmCampaign?: string
 ) {
   const { isRealTimeEnabled, setRealTimeEnabled } = useDashboardStore()
-  const metricsQuery = useMetrics(days, startDate, endDate)
+  const metricsQuery = useMetrics(days, startDate, endDate, utmCampaign)
 
   const toggleRealTime = () => {
     const newState = !isRealTimeEnabled
