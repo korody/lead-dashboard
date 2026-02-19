@@ -394,19 +394,20 @@ export async function GET(request: Request) {
       // Buscar leads do período anterior do banco
       const { data: previousLeads, count: previousCount } = await supabase
         .from('quiz_leads')
-        .select('is_hot_lead_vip, whatsapp_status, created_at', { count: 'exact' })
+        .select('is_hot_lead_vip, status_tags, created_at', { count: 'exact' })
         .gte('created_at', prevStartIso)
         .lt('created_at', prevEndIso)
-      
+
       const previousTotal = previousCount || 0
       const previousVips = previousLeads?.filter(l => l.is_hot_lead_vip === true).length || 0
-      
-      // Calcular whatsappSuccess do período anterior
-      const previousWhatsappSent = previousLeads?.filter(l => 
-        l.whatsapp_status === 'sent' || 
-        l.whatsapp_status === 'resultados_enviados' ||
-        l.whatsapp_status === 'desafio_enviado'
-      ).length || 0
+
+      // Calcular whatsappSuccess do período anterior usando status_tags
+      const previousWhatsappSent = previousLeads?.filter(l => {
+        const tags = Array.isArray(l.status_tags) ? l.status_tags : []
+        return tags.some((tag: string) =>
+          ['sent', 'resultados_enviados', 'desafio_enviado', 'RESULTADOS_ENVIADOS', 'DESAFIO_ENVIADO'].includes(tag)
+        )
+      }).length || 0
       const previousWhatsappSuccess = previousTotal > 0 
         ? (previousWhatsappSent / previousTotal) * 100 
         : 0
