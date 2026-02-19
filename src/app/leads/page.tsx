@@ -428,21 +428,13 @@ function LeadsPageContent() {
                     Gestão de Leads (Respondentes Diagnóstico)
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="w-44">
-                    <DateRangeFilter
-                      selected={selectedDays}
-                      onChange={(days) => setSelectedDays(days)}
-                    />
-                  </div>
-                  <button
-                    onClick={exportarCSV}
-                    className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
-                  >
-                    <Download className="w-5 h-5" />
-                    Exportar CSV
-                  </button>
-                </div>
+                <button
+                  onClick={exportarCSV}
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
+                >
+                  <Download className="w-5 h-5" />
+                  Exportar CSV
+                </button>
               </div>
             </CardHeader>
 
@@ -479,6 +471,14 @@ function LeadsPageContent() {
                     Filtros Avançados
                     {mostrarFiltros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
+
+                  <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                  <div className="w-44">
+                    <DateRangeFilter
+                      selected={selectedDays}
+                      onChange={(days) => setSelectedDays(days)}
+                    />
+                  </div>
 
                   {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP || filtroAluno !== 'TODOS' || filtroAlunoBNY !== 'TODOS') && (
                     <>
