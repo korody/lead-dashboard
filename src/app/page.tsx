@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
+import {
   Target,
   RefreshCw
 } from 'lucide-react'
 import { useRealTimeMetrics } from '@/hooks/use-metrics'
 import { nowInBRT } from '@/lib/utils'
 import { useSidebarControls } from '@/contexts/sidebar-controls-context'
+import { useCampaign } from '@/contexts/campaign-context'
 import { DashboardControls } from '@/components/ui/dashboard-controls'
 import { InteractiveLineChart } from '@/components/charts/interactive-line-chart'
 import { InteractiveHorizontalBarChart } from '@/components/charts/interactive-horizontal-bar-chart'
@@ -19,9 +20,26 @@ import { DateRangeOption } from '@/components/ui/date-range-filter'
 import { StoicLoadingOverlay } from '@/components/ui/stoic-loading-overlay'
 
 export default function HomePage() {
+  const { selectedCampaign } = useCampaign()
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
-  const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays)
+
+  // Pre-fill date filter when campaign changes
+  useEffect(() => {
+    if (selectedCampaign) {
+      setSelectedDays(9999)
+    }
+  }, [selectedCampaign?.id])
+
+  // Get campaign dates for metrics
+  const campaignStart = selectedCampaign?.data_inicio ?? undefined
+  const campaignEnd = selectedCampaign?.data_fim ?? undefined
+
+  const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(
+    selectedDays,
+    campaignStart,
+    campaignEnd
+  )
   const { setControls } = useSidebarControls()
 
   // Esconde o overlay após os dados carregarem
@@ -56,27 +74,42 @@ export default function HomePage() {
 
   const diasReais = selectedDays >= 9999 ? calcularDiasReais() : selectedDays
 
-  // Calcula dias e horas restantes até segunda-feira 20h
+  // Get campaign goal and deadline
+  const campaignGoal = selectedCampaign?.meta_leads ?? 10000
+  const campaignName = selectedCampaign?.nome ?? 'Campanha'
+
+  // Calcula dias e horas restantes até deadline da campanha
   const calcularTempoRestante = () => {
-  // Obtém a data/hora atual em BRT (UTC-3)
-  const agoraBRT = nowInBRT()
-    
-    // Deadline: Segunda-feira, 3 de novembro de 2025, 20h BRT
-  const deadline = new Date('2025-11-03T20:00:00-03:00')
-    
+    // Obtém a data/hora atual em BRT (UTC-3)
+    const agoraBRT = nowInBRT()
+
+    // Se não há deadline, retorna valores zerados (campanha em andamento)
+    if (!selectedCampaign?.data_fim) {
+      return {
+        dias: 0,
+        horas: 0,
+        total: 0,
+        hasDeadline: false
+      }
+    }
+
+    // Deadline: último dia da campanha às 20h BRT
+    const deadline = new Date(`${selectedCampaign.data_fim}T20:00:00-03:00`)
+
     const diferencaMs = deadline.getTime() - agoraBRT.getTime()
     const diasRestantes = diferencaMs / (1000 * 60 * 60 * 24)
     const horasRestantes = (diferencaMs / (1000 * 60 * 60)) % 24
-    
+
     return {
       dias: Math.floor(diasRestantes),
       horas: Math.floor(horasRestantes),
-      total: diasRestantes
+      total: diasRestantes,
+      hasDeadline: true
     }
   }
 
   const tempoRestante = calcularTempoRestante()
-  const leadsRestantes = 10000 - (metrics?.totalLeads || 0)
+  const leadsRestantes = campaignGoal - (metrics?.totalLeads || 0)
   const leadsPorDia = tempoRestante.total > 0 ? Math.ceil(leadsRestantes / tempoRestante.total) : 0
 
   // Set sidebar controls
@@ -234,11 +267,13 @@ export default function HomePage() {
                     </div>
                     Meta de Leads
                   </h3>
-                  <p className="text-gray-400 text-xs mt-1">Campanha BNY2 - Objetivo: 10.000 leads</p>
+                  <p className="text-gray-400 text-xs mt-1">
+                    Campanha {campaignName} - Objetivo: {campaignGoal.toLocaleString('pt-BR')} leads
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="text-3xl font-black bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 bg-clip-text text-transparent">
-                    {isLoading ? '...' : `${((metrics?.totalLeads || 0) / 10000 * 100).toFixed(1)}%`}
+                    {isLoading ? '...' : `${((metrics?.totalLeads || 0) / campaignGoal * 100).toFixed(1)}%`}
                   </div>
                   <p className="text-gray-400 text-xs">da meta</p>
                 </div>
@@ -261,11 +296,13 @@ export default function HomePage() {
                     </div>
                     <div className="text-xl text-gray-600">/</div>
                     <div className="text-center">
-                      <div className="text-2xl font-black text-gray-400">10.000</div>
+                      <div className="text-2xl font-black text-gray-400">
+                        {campaignGoal.toLocaleString('pt-BR')}
+                      </div>
                       <p className="text-[10px] text-gray-500 mt-0.5">Meta</p>
                     </div>
                   </div>
-                  
+
                   <div className="text-right">
                     <motion.div
                       initial={{ scale: 0 }}
@@ -273,7 +310,7 @@ export default function HomePage() {
                       transition={{ delay: 0.6, type: "spring" }}
                       className="text-2xl font-bold text-amber-400"
                     >
-                      {isLoading ? '...' : `${(10000 - (metrics?.totalLeads || 0)).toLocaleString('pt-BR')}`}
+                      {isLoading ? '...' : `${leadsRestantes.toLocaleString('pt-BR')}`}
                     </motion.div>
                     <p className="text-[10px] text-gray-400 mt-0.5">Faltam</p>
                   </div>
@@ -283,8 +320,8 @@ export default function HomePage() {
                 <div className="relative h-4 bg-gray-800/50 rounded-full overflow-hidden border border-gray-700/50 backdrop-blur-sm">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ 
-                      width: `${Math.min(((metrics?.totalLeads || 0) / 10000 * 100), 100)}%` 
+                    animate={{
+                      width: `${Math.min(((metrics?.totalLeads || 0) / campaignGoal * 100), 100)}%`
                     }}
                     transition={{ duration: 1.5, delay: 0.4, ease: "easeOut" }}
                     className="h-full bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 rounded-full relative overflow-hidden"
@@ -301,14 +338,14 @@ export default function HomePage() {
                   {/* Progress indicator */}
                   <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-xs font-bold text-white drop-shadow-lg">
-                      {isLoading ? '' : `${((metrics?.totalLeads || 0) / 10000 * 100).toFixed(1)}%`}
+                      {isLoading ? '' : `${((metrics?.totalLeads || 0) / campaignGoal * 100).toFixed(1)}%`}
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Additional Stats */}
-              <div className="grid grid-cols-4 gap-4 pt-4 border-t border-gray-700/50">
+              <div className={`grid gap-4 pt-4 border-t border-gray-700/50 ${tempoRestante.hasDeadline ? 'grid-cols-4' : 'grid-cols-3'}`}>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-400">
                     {isLoading ? '...' : diasReais}
@@ -327,12 +364,16 @@ export default function HomePage() {
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Leads Necessários por Dia</p>
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-amber-400">
-                    {isLoading ? '...' : `${tempoRestante.dias}d ${tempoRestante.horas}h`}
+                {tempoRestante.hasDeadline && (
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-amber-400">
+                      {isLoading ? '...' : `${tempoRestante.dias}d ${tempoRestante.horas}h`}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      até Encerramento ({selectedCampaign?.data_fim}, 20hrs)
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">até Encerramento Captação (03/11, 20hrs)</p>
-                </div>
+                )}
               </div>
             </CardContent>
           </Card>

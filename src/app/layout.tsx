@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "../components/providers";
 import { SidebarControlsProvider } from "../contexts/sidebar-controls-context";
+import { CampaignProvider } from "../contexts/campaign-context";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Lead Dashboard - BNY2",
+  title: "Lead Dashboard",
   description: "Dashboard de análise de leads e métricas de conversão",
 }
 
@@ -30,9 +31,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-gray-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-indigo-950`}
       >
         <Providers>
-          <SidebarControlsProvider>
-            {children}
-          </SidebarControlsProvider>
+          <CampaignProvider>
+            <SidebarControlsProvider>
+              {children}
+            </SidebarControlsProvider>
+          </CampaignProvider>
         </Providers>
       </body>
     </html>

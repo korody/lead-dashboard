@@ -33,6 +33,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const requestedDays = parseInt(searchParams.get('days') || '30', 10)
   const days = isNaN(requestedDays) ? 30 : requestedDays
+  const startDateParam = searchParams.get('startDate') // YYYY-MM-DD or null
+  const endDateParam = searchParams.get('endDate') // YYYY-MM-DD or null
   try {
     // console.log('Starting metrics fetch...')
     
@@ -79,9 +81,16 @@ export async function GET(request: Request) {
     }
     
   // Calcular data de corte baseada no período selecionado (timezone Brasil)
-  const isTodoTempo = days >= 9999
-  // Usar timezone de São Paulo (UTC-3)
-  const nowBrasil = nowInBRT()
+  let cutoffIso: string | null = null
+  let endCutoffIso: string | null = null
+
+  if (startDateParam) {
+    // Se startDate é fornecido (via campanha), usar como cutoff exato (BRT midnight)
+    cutoffIso = new Date(`${startDateParam}T00:00:00-03:00`).toISOString()
+  } else {
+    // Usar lógica original baseada em 'days'
+    const isTodoTempo = days >= 9999
+    const nowBrasil = nowInBRT()
     const cutoffDate = new Date(nowBrasil)
     if (!isTodoTempo) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
@@ -89,19 +98,28 @@ export async function GET(request: Request) {
     } else {
       cutoffDate.setFullYear(2000) // Data bem antiga para pegar tudo
     }
-    const cutoffIso = cutoffDate.toISOString()
+    cutoffIso = cutoffDate.toISOString()
+  }
+
+  if (endDateParam) {
+    // Se endDate é fornecido (via campanha), usar como fim de dia em BRT
+    endCutoffIso = new Date(`${endDateParam}T23:59:59-03:00`).toISOString()
+  }
     
-    // console.log(`🔍 Filtrando leads desde ${cutoffIso} (${isTodoTempo ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
+    // console.log(`🔍 Filtrando leads desde ${cutoffIso} (${cutoffIso === null ? 'TODO O TEMPO' : `últimos ${days} dias`}) - Timezone: America/Sao_Paulo`)
     
     // Buscar count total primeiro (filtrado por período ou tudo)
     let countQuery = supabase
       .from('quiz_leads')
       .select('*', { count: 'exact', head: true })
-    
-    if (!isTodoTempo) {
+
+    if (cutoffIso) {
       countQuery = countQuery.gte('created_at', cutoffIso)
     }
-    
+    if (endCutoffIso) {
+      countQuery = countQuery.lte('created_at', endCutoffIso)
+    }
+
   const { count: totalCount } = await countQuery
     
     // console.log(`📊 Total de leads no Supabase: ${totalCount}`)
@@ -120,9 +138,12 @@ export async function GET(request: Request) {
         .select('lead_score, status_tags, created_at, prioridade, elemento_principal, is_hot_lead_vip, id, nome, email, celular, quadrante')
         .order('id', { ascending: true })
         .range(start, start + batchSize - 1)
-      
-      if (!isTodoTempo) {
+
+      if (cutoffIso) {
         query = query.gte('created_at', cutoffIso)
+      }
+      if (endCutoffIso) {
+        query = query.lte('created_at', endCutoffIso)
       }
       
       const { data, error } = await query
@@ -158,9 +179,12 @@ export async function GET(request: Request) {
       .from('whatsapp_logs')
       .select('status, created_at')
       .range(0, 9999)
-    
-    if (!isTodoTempo) {
+
+    if (cutoffIso) {
       logsQuery = logsQuery.gte('created_at', cutoffIso)
+    }
+    if (endCutoffIso) {
+      logsQuery = logsQuery.lte('created_at', endCutoffIso)
     }
     
     const [

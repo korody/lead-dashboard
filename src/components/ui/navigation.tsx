@@ -5,10 +5,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSidebarControls } from '@/contexts/sidebar-controls-context'
-import { 
-  LayoutDashboard, 
-  Users, 
-  TrendingUp, 
+import { CampaignSelector } from './campaign-selector'
+import {
+  LayoutDashboard,
+  Users,
+  TrendingUp,
   ClipboardCheck,
   Menu,
   X,
@@ -114,8 +115,11 @@ export function Navigation({ children }: NavigationProps) {
           </div>
 
           {/* Controls & Filters */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-            {/* Dynamic controls from context */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-800 space-y-3">
+            {/* Campaign selector — always visible */}
+            <CampaignSelector />
+
+            {/* Dynamic controls from context (per-page: date range, real-time toggle) */}
             {controls && (
               <div className="space-y-3">
                 {controls}

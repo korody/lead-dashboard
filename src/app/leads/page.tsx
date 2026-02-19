@@ -15,6 +15,7 @@ import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
 import { DateRangeFilter, DateRangeOption } from '../../components/ui/date-range-filter'
 import { nowInBRT } from '../../lib/utils'
 import { useSidebarControls } from '../../contexts/sidebar-controls-context'
+import { useCampaign } from '../../contexts/campaign-context'
 
 interface Lead {
   id: string
@@ -38,6 +39,7 @@ type SortDirection = 'asc' | 'desc'
 
 function LeadsPageContent() {
   const searchParams = useSearchParams()
+  const { selectedCampaign } = useCampaign()
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -62,6 +64,13 @@ function LeadsPageContent() {
   const { setControls } = useSidebarControls()
   const LEADS_POR_PAGINA = 50
 
+  // Pre-fill date filter when campaign changes
+  useEffect(() => {
+    if (selectedCampaign) {
+      setSelectedDays(9999)
+    }
+  }, [selectedCampaign?.id])
+
   // Inject time filter into sidebar (same pattern as Insights page)
   useEffect(() => {
     setControls(
@@ -77,12 +86,26 @@ function LeadsPageContent() {
   }, [selectedDays])
 
   const getCutoffIso = () => {
-    if (selectedDays >= 9999) return null
+    if (selectedDays >= 9999) {
+      // When showing all time, use campaign's start date if available
+      if (selectedCampaign?.data_inicio) {
+        return new Date(`${selectedCampaign.data_inicio}T00:00:00-03:00`).toISOString()
+      }
+      return null
+    }
     const now = nowInBRT()
     const cutoff = new Date(now)
     cutoff.setDate(cutoff.getDate() - selectedDays)
     cutoff.setHours(0, 0, 0, 0)
     return cutoff.toISOString()
+  }
+
+  const getEndCutoffIso = () => {
+    // If campaign has an end date, filter up to that date
+    if (selectedCampaign?.data_fim) {
+      return new Date(`${selectedCampaign.data_fim}T23:59:59-03:00`).toISOString()
+    }
+    return null
   }
 
   useEffect(() => {
@@ -169,6 +192,12 @@ function LeadsPageContent() {
         countQuery = countQuery.gte('created_at', cutoff)
       }
 
+      const endCutoff = getEndCutoffIso()
+      if (endCutoff) {
+        query = query.lte('created_at', endCutoff)
+        countQuery = countQuery.lte('created_at', endCutoff)
+      }
+
       // Apply search term if exists
       if (searchTerm.trim() !== '') {
         const like = `%${searchTerm.trim()}%`
@@ -237,6 +266,8 @@ function LeadsPageContent() {
         .select('*', { count: 'exact', head: true })
       const cutoff = getCutoffIso()
       if (cutoff) query = query.gte('created_at', cutoff)
+      const endCutoff = getEndCutoffIso()
+      if (endCutoff) query = query.lte('created_at', endCutoff)
       const { count, error } = await query
       if (error) throw error
       setTotalLeads(count || 0)
@@ -256,6 +287,8 @@ function LeadsPageContent() {
         .range(0, LEADS_POR_PAGINA - 1)
       const cutoff = getCutoffIso()
       if (cutoff) query = query.gte('created_at', cutoff)
+      const endCutoff = getEndCutoffIso()
+      if (endCutoff) query = query.lte('created_at', endCutoff)
       const { data, error } = await query
       if (error) throw error
       setLeads(data || [])
@@ -280,6 +313,8 @@ function LeadsPageContent() {
         .range(inicio, fim)
       const cutoff = getCutoffIso()
       if (cutoff) query = query.gte('created_at', cutoff)
+      const endCutoff = getEndCutoffIso()
+      if (endCutoff) query = query.lte('created_at', endCutoff)
       const { data, error } = await query
       if (error) throw error
       setLeads(prev => [...prev, ...(data || [])])
