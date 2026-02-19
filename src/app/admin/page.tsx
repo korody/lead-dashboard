@@ -46,7 +46,8 @@ export default function AdminPage() {
       const { data: campaignsData, error } = await supabase
         .from('dash_campaigns')
         .select('*')
-        .order('created_at')
+        .order('prioridade', { ascending: true })
+        .order('created_at', { ascending: true })
 
       if (error) throw error
       setCampaigns(campaignsData ?? [])
@@ -92,6 +93,7 @@ export default function AdminPage() {
           data_fim: editForm.data_fim,
           utm_campaign: editForm.utm_campaign,
           ac_tag_id: editForm.ac_tag_id ?? null,
+          prioridade: editForm.prioridade ?? 0,
           ativo: editForm.ativo,
         })
         .eq('id', editingId)
@@ -132,6 +134,9 @@ export default function AdminPage() {
 
   const handleAddNew = async () => {
     try {
+      const maxPrioridade = campaigns.length > 0
+        ? Math.max(...campaigns.map(c => c.prioridade ?? 0)) + 1
+        : 0
       const { error } = await supabase.from('dash_campaigns').insert({
         slug: `campaign-${Date.now()}`,
         nome: 'Nova Campanha',
@@ -139,6 +144,7 @@ export default function AdminPage() {
         data_inicio: null,
         data_fim: null,
         utm_campaign: null,
+        prioridade: maxPrioridade,
         ativo: true,
       })
 
@@ -236,6 +242,9 @@ export default function AdminPage() {
             <table className="w-full">
               <thead className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-gray-800 dark:to-gray-700">
                 <tr>
+                  <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white w-20">
+                    Prioridade
+                  </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                     Nome
                   </th>
@@ -273,6 +282,17 @@ export default function AdminPage() {
                   >
                     {editingId === campaign.id ? (
                       <>
+                        <td className="px-4 py-4">
+                          <input
+                            type="number"
+                            min="0"
+                            value={editForm.prioridade ?? 0}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, prioridade: parseInt(e.target.value) || 0 })
+                            }
+                            className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-16 text-center"
+                          />
+                        </td>
                         <td className="px-6 py-4">
                           <input
                             type="text"
@@ -386,6 +406,11 @@ export default function AdminPage() {
                       </>
                     ) : (
                       <>
+                        <td className="px-4 py-4 text-center">
+                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-sm font-bold">
+                            {campaign.prioridade ?? 0}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white">
                           {campaign.nome}
                         </td>

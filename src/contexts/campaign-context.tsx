@@ -17,14 +17,15 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase
           .from('dash_campaigns')
           .select('*')
+          .order('prioridade', { ascending: true })
           .order('created_at', { ascending: true })
 
         if (error) throw error
 
         if (data && data.length > 0) {
           setCampaigns(data)
-          // Seleciona a campanha ativa por padrão, ou a última
-          const active = data.find((c) => c.ativo) ?? data[data.length - 1]
+          // Seleciona a campanha ativa com menor prioridade (primeira na lista)
+          const active = data.find((c) => c.ativo) ?? data[0]
           setSelectedCampaign(active)
         }
       } catch (error) {
