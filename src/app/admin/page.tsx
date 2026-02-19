@@ -103,8 +103,9 @@ export default function AdminPage() {
       setEditForm({})
       loadCampaigns()
     } catch (error) {
-      console.error('Erro ao salvar:', error)
-      toast.error('Erro ao salvar campanha')
+      const msg = (error as { message?: string })?.message || JSON.stringify(error)
+      console.error('Erro ao salvar:', msg)
+      toast.error(`Erro ao salvar: ${msg}`)
     } finally {
       setIsLoading(false)
     }
