@@ -37,11 +37,13 @@ export async function GET(request: Request) {
   const endDateParam = searchParams.get('endDate') // YYYY-MM-DD or null
   const utmCampaignParam = searchParams.get('utmCampaign') // ex: 'qgs1', 'bny2'
   const acTagIdParam = searchParams.get('acTagId') ? parseInt(searchParams.get('acTagId')!, 10) : null
+  const sendflowCampaignIdParam = searchParams.get('sendflowCampaignId') || null
   try {
     // console.log('Starting metrics fetch...')
     
 
-    const sendFlowCampaignId = process.env.SENDFLOW_CAMPAIGN_ID || 'wg2d0SAmMwoRt0kBOVG'
+    // Usa o ID do SendFlow da campanha selecionada, ou o padrão do env
+    const sendFlowCampaignId = sendflowCampaignIdParam || process.env.SENDFLOW_CAMPAIGN_ID || 'wg2d0SAmMwoRt0kBOVG'
     const acTagId = parseInt(process.env.ACTIVECAMPAIGN_TAG_ID || '583', 10)
 
     let totalLeadsAC = 0;

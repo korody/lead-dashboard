@@ -93,6 +93,7 @@ export default function AdminPage() {
           data_fim: editForm.data_fim,
           utm_campaign: editForm.utm_campaign,
           ac_tag_id: editForm.ac_tag_id ?? null,
+          sendflow_campaign_id: editForm.sendflow_campaign_id ?? null,
           prioridade: editForm.prioridade ?? 0,
           ativo: editForm.ativo,
         })
@@ -255,6 +256,9 @@ export default function AdminPage() {
                     AC Tag ID
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    SendFlow ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                     Total de Leads
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
@@ -329,6 +333,20 @@ export default function AdminPage() {
                               })
                             }
                             className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-24"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            placeholder="ex: wg2d0SAmMwoRt0kBOVG"
+                            value={editForm.sendflow_campaign_id ?? ''}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                sendflow_campaign_id: e.target.value || null,
+                              })
+                            }
+                            className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-40 font-mono"
                           />
                         </td>
                         <td className="px-6 py-4 text-gray-400 text-sm">
@@ -427,6 +445,15 @@ export default function AdminPage() {
                           {campaign.ac_tag_id ? (
                             <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-xs">
                               {campaign.ac_tag_id}
+                            </code>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {campaign.sendflow_campaign_id ? (
+                            <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-xs font-mono">
+                              {campaign.sendflow_campaign_id.slice(0, 10)}…
                             </code>
                           ) : (
                             '-'

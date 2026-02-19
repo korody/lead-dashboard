@@ -77,8 +77,10 @@ function splitCSVLine(line, sep) {
 
 async function main() {
   const csvPath = process.argv[2]
-  if (!csvPath) {
-    console.error('Uso: node scripts/mark-qgs1-leads.mjs <arquivo.csv>')
+  const utmCampaign = process.argv[3]
+  if (!csvPath || !utmCampaign) {
+    console.error('Uso: node scripts/mark-qgs1-leads.mjs <arquivo.csv> <utm_campaign>')
+    console.error('Exemplo: node scripts/mark-qgs1-leads.mjs scripts/dex.csv dex')
     process.exit(1)
   }
 
@@ -97,8 +99,10 @@ async function main() {
   }
   const supabase = createClient(supabaseUrl, serviceKey)
 
+  console.log(`\n🏷️  Campanha alvo: ${utmCampaign}`)
+
   // Lê e parseia o CSV
-  console.log(`\n📂 Lendo CSV: ${absPath}`)
+  console.log(`📂 Lendo CSV: ${absPath}`)
   const content = fs.readFileSync(absPath, 'utf-8')
   const rows = parseCSV(content)
   console.log(`📋 Total de linhas no CSV: ${rows.length}`)
@@ -152,8 +156,7 @@ async function main() {
     totalFound += leads.length
 
     const semUTM = leads.filter(l => !l.utm_campaign)
-    const comOutraUTM = leads.filter(l => l.utm_campaign && l.utm_campaign.toLowerCase() !== 'qgs1')
-    const jaQGS1 = leads.filter(l => l.utm_campaign?.toLowerCase() === 'qgs1')
+    const comOutraUTM = leads.filter(l => l.utm_campaign && l.utm_campaign.toLowerCase() !== utmCampaign.toLowerCase())
 
     totalJaTemUTM += comOutraUTM.length
 
@@ -161,7 +164,7 @@ async function main() {
       const ids = semUTM.map(l => l.id)
       const { error: updateError } = await supabase
         .from('quiz_leads')
-        .update({ utm_campaign: 'qgs1' })
+        .update({ utm_campaign: utmCampaign.toLowerCase() })
         .in('id', ids)
 
       if (updateError) {
@@ -171,10 +174,6 @@ async function main() {
         process.stdout.write(`\r✏️  Atualizados: ${totalUpdated} | Encontrados: ${totalFound}`)
       }
     }
-
-    if (jaQGS1.length > 0) {
-      // Já marcados corretamente — não precisa atualizar
-    }
   }
 
   console.log('\n\n═══════════════════════════════════════════')
@@ -182,7 +181,7 @@ async function main() {
   console.log('═══════════════════════════════════════════')
   console.log(`📧 Emails no CSV:              ${emails.length}`)
   console.log(`🔍 Leads encontrados:          ${totalFound}`)
-  console.log(`✅ Marcados como qgs1:         ${totalUpdated}`)
+  console.log(`✅ Marcados como ${utmCampaign}:${' '.repeat(Math.max(1, 15 - utmCampaign.length))}${totalUpdated}`)
   console.log(`⚠️  Com outra utm (não tocados): ${totalJaTemUTM}`)
   console.log(`❓ Emails sem match no DB:      ${emails.length - totalFound}`)
   console.log('═══════════════════════════════════════════\n')

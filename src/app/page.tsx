@@ -40,7 +40,8 @@ export default function HomePage() {
     campaignStart,
     campaignEnd,
     selectedCampaign?.utm_campaign ?? undefined,
-    selectedCampaign?.ac_tag_id ?? undefined
+    selectedCampaign?.ac_tag_id ?? undefined,
+    selectedCampaign?.sendflow_campaign_id ?? undefined
   )
   const { setControls } = useSidebarControls()
 
