@@ -162,7 +162,11 @@ export default function HomePage() {
                   <p className="text-3xl font-bold text-white">
                     {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
                   </p>
-                  <p className="text-xs text-white/70">Total geral (ActiveCampaign)</p>
+                  <p className="text-xs text-white/70">
+                    {selectedCampaign?.utm_campaign
+                      ? `Diagnósticos UTM: ${selectedCampaign.utm_campaign} (Supabase)`
+                      : 'Total geral (ActiveCampaign)'}
+                  </p>
                 </div>
               </CardContent>
             </Card>
