@@ -43,20 +43,28 @@ export default function AdminPage() {
 
   const loadCampaigns = async () => {
     try {
-      const [campaignsResult, leadsResult] = await Promise.all([
-        supabase.from('dash_campaigns').select('*').order('created_at'),
-        supabase.from('quiz_leads').select('utm_campaign').not('utm_campaign', 'is', null)
-      ])
+      const { data: campaignsData, error } = await supabase
+        .from('dash_campaigns')
+        .select('*')
+        .order('created_at')
 
-      if (campaignsResult.error) throw campaignsResult.error
-      setCampaigns(campaignsResult.data ?? [])
+      if (error) throw error
+      setCampaigns(campaignsData ?? [])
 
-      // Conta leads por utm_campaign
+      // Conta leads por campanha usando count exato (sem paginação)
+      const utms = campaignsData?.filter(c => c.utm_campaign).map(c => c.utm_campaign as string) ?? []
+      const countResults = await Promise.all(
+        utms.map(utm =>
+          supabase
+            .from('quiz_leads')
+            .select('*', { count: 'exact', head: true })
+            .ilike('utm_campaign', utm)
+            .then(({ count }) => ({ utm: utm.toLowerCase(), count: count ?? 0 }))
+        )
+      )
+
       const counts: Record<string, number> = {}
-      leadsResult.data?.forEach(lead => {
-        const utm = lead.utm_campaign as string
-        counts[utm] = (counts[utm] || 0) + 1
-      })
+      countResults.forEach(({ utm, count }) => { counts[utm] = count })
       setLeadCounts(counts)
     } catch (error) {
       console.error('Erro ao carregar campanhas:', error)
@@ -185,23 +193,6 @@ export default function AdminPage() {
             </button>
           </div>
 
-          <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p className="text-xs text-blue-700 dark:text-blue-300">
-              <strong>SQL para criar a tabela:</strong>
-            </p>
-            <pre className="mt-2 text-xs bg-white dark:bg-gray-900 p-2 rounded overflow-auto text-gray-700 dark:text-gray-300">
-{`CREATE TABLE dash_campaigns (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug text UNIQUE NOT NULL,
-  nome text NOT NULL,
-  meta_leads integer NOT NULL DEFAULT 10000,
-  data_inicio date,
-  data_fim date,
-  ativo boolean NOT NULL DEFAULT true,
-  created_at timestamptz DEFAULT now()
-);`}
-            </pre>
-          </div>
         </motion.div>
       </div>
     )

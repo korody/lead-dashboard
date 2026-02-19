@@ -83,6 +83,7 @@ export async function GET(request: Request) {
   // Calcular data de corte baseada no período selecionado (timezone Brasil)
   let cutoffIso: string | null = null
   let endCutoffIso: string | null = null
+  const nowBrasil = nowInBRT()
 
   if (startDateParam) {
     // Se startDate é fornecido (via campanha), usar como cutoff exato (BRT midnight)
@@ -90,7 +91,6 @@ export async function GET(request: Request) {
   } else {
     // Usar lógica original baseada em 'days'
     const isTodoTempo = days >= 9999
-    const nowBrasil = nowInBRT()
     const cutoffDate = new Date(nowBrasil)
     if (!isTodoTempo) {
       cutoffDate.setDate(cutoffDate.getDate() - days)
