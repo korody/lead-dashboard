@@ -91,6 +91,7 @@ export default function AdminPage() {
           data_inicio: editForm.data_inicio,
           data_fim: editForm.data_fim,
           utm_campaign: editForm.utm_campaign,
+          ac_tag_id: editForm.ac_tag_id ?? null,
           ativo: editForm.ativo,
         })
         .eq('id', editingId)
@@ -241,6 +242,9 @@ export default function AdminPage() {
                     UTM Campaign
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    AC Tag ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                     Total de Leads
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
@@ -290,6 +294,20 @@ export default function AdminPage() {
                               })
                             }
                             className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-28"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="number"
+                            placeholder="ex: 679"
+                            value={editForm.ac_tag_id ?? ''}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                ac_tag_id: e.target.value ? parseInt(e.target.value) : null,
+                              })
+                            }
+                            className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-24"
                           />
                         </td>
                         <td className="px-6 py-4 text-gray-400 text-sm">
@@ -374,6 +392,15 @@ export default function AdminPage() {
                           {campaign.utm_campaign ? (
                             <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-xs">
                               {campaign.utm_campaign}
+                            </code>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                          {campaign.ac_tag_id ? (
+                            <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-xs">
+                              {campaign.ac_tag_id}
                             </code>
                           ) : (
                             '-'

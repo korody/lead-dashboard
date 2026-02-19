@@ -36,6 +36,7 @@ export async function GET(request: Request) {
   const startDateParam = searchParams.get('startDate') // YYYY-MM-DD or null
   const endDateParam = searchParams.get('endDate') // YYYY-MM-DD or null
   const utmCampaignParam = searchParams.get('utmCampaign') // ex: 'qgs1', 'bny2'
+  const acTagIdParam = searchParams.get('acTagId') ? parseInt(searchParams.get('acTagId')!, 10) : null
   try {
     // console.log('Starting metrics fetch...')
     
@@ -46,23 +47,24 @@ export async function GET(request: Request) {
     let totalLeadsAC = 0;
     let totalGruposWhatsApp = 0;
 
-    // Quando há filtro de UTM, pula a chamada lenta do ActiveCampaign
-    // (o total virá do count do Supabase filtrado por utm_campaign)
-    if (!utmCampaignParam) {
-      const acPromise = activeCampaignClient.getTotalContactsByTag(acTagId).catch(error => {
+    // Decide qual tag ID usar para o ActiveCampaign
+    const tagIdToUse = acTagIdParam ?? acTagId // Usa o tag da campanha se disponível, senão o padrão
+
+    const sendFlowPromise = sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(() => 0)
+
+    if (!utmCampaignParam || acTagIdParam) {
+      // Sem filtro UTM → usa tag padrão (visão geral)
+      // Com filtro UTM + acTagId → usa tag específica da campanha
+      const acPromise = activeCampaignClient.getTotalContactsByTag(tagIdToUse).catch(error => {
         console.error('ActiveCampaign fetch error:', error)
-        return 0
-      })
-      const sendFlowPromise = sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(error => {
-        console.error('SendFlow fetch error:', error)
         return 0
       })
       const [ac, grupos] = await Promise.all([acPromise, sendFlowPromise])
       totalLeadsAC = ac
       totalGruposWhatsApp = grupos
     } else {
-      // Quando filtro UTM ativo, só busca SendFlow
-      totalGruposWhatsApp = await sendFlowClient.getTotalParticipants(sendFlowCampaignId).catch(() => 0)
+      // UTM ativo mas sem ac_tag_id → pula AC, total vem do Supabase
+      totalGruposWhatsApp = await sendFlowPromise
     }
     
   // Calcular data de corte baseada no período selecionado (timezone Brasil)
@@ -110,8 +112,8 @@ export async function GET(request: Request) {
 
   const { count: totalCount } = await countQuery
 
-  // Quando filtro UTM ativo, o total de leads vem do Supabase (não do ActiveCampaign)
-  if (utmCampaignParam) {
+  // Quando UTM ativo mas sem ac_tag_id: total vem do Supabase (AC foi pulado)
+  if (utmCampaignParam && !acTagIdParam) {
     totalLeadsAC = totalCount ?? 0
   }
     

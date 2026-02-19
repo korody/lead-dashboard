@@ -39,7 +39,8 @@ export default function HomePage() {
     selectedDays,
     campaignStart,
     campaignEnd,
-    selectedCampaign?.utm_campaign ?? undefined
+    selectedCampaign?.utm_campaign ?? undefined,
+    selectedCampaign?.ac_tag_id ?? undefined
   )
   const { setControls } = useSidebarControls()
 
@@ -163,9 +164,11 @@ export default function HomePage() {
                     {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
                   </p>
                   <p className="text-xs text-white/70">
-                    {selectedCampaign?.utm_campaign
-                      ? `Diagnósticos UTM: ${selectedCampaign.utm_campaign} (Supabase)`
-                      : 'Total geral (ActiveCampaign)'}
+                    {selectedCampaign?.ac_tag_id
+                      ? `ActiveCampaign (tag ${selectedCampaign.ac_tag_id})`
+                      : selectedCampaign?.utm_campaign
+                        ? `Diagnósticos UTM: ${selectedCampaign.utm_campaign} (Supabase)`
+                        : 'Total geral (ActiveCampaign)'}
                   </p>
                 </div>
               </CardContent>
