@@ -104,13 +104,10 @@ export function Navigation({ children }: NavigationProps) {
                 whileHover={{ scale: 1.05 }}
                 className="flex items-center justify-center"
               >
-                <img 
-                  src="/black-logo.png" 
-                  alt="Black Logo" 
+                <img
+                  src="/logo mestre ye.png"
+                  alt="Logo Mestre Ye"
                   className="w-full h-auto max-w-[180px] object-contain"
-                  onError={(e) => {
-                    e.currentTarget.src = '/black-logo.svg'
-                  }}
                 />
               </motion.div>
             </Link>
