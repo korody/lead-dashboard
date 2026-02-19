@@ -64,11 +64,9 @@ function LeadsPageContent() {
   const { setControls } = useSidebarControls()
   const LEADS_POR_PAGINA = 50
 
-  // Pre-fill date filter when campaign changes
+  // Reset date filter when campaign changes (including null = "Todas")
   useEffect(() => {
-    if (selectedCampaign) {
-      setSelectedDays(9999)
-    }
+    setSelectedDays(9999)
   }, [selectedCampaign?.id])
 
   // Inject time filter into sidebar (same pattern as Insights page)
@@ -168,7 +166,7 @@ function LeadsPageContent() {
       buscarTotalSupabase()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, selectedDays, isMounted])
+  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, selectedDays, isMounted, selectedCampaign?.id])
 
   const buscarComFiltros = async () => {
     try {
