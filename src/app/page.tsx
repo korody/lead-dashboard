@@ -369,7 +369,7 @@ export default function HomePage() {
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-rose-400">
-                    {isLoading ? '...' : leadsPorDia.toLocaleString('pt-BR')}
+                    {isLoading ? '...' : tempoRestante.hasDeadline ? leadsPorDia.toLocaleString('pt-BR') : '—'}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Leads Necessários por Dia</p>
                 </div>

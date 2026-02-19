@@ -35,6 +35,7 @@ export interface DashboardMetrics {
       taxa_perda_diagnostico_grupos: string
     }
   }
+  quadrants?: Array<{ id: number; title: string; desc: string; color: string; count: number; percentage: number }>
   whatsappLogs: unknown
   vips24h: Array<unknown>
   resumo_diario: unknown

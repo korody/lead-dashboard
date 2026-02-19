@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
+import {
   Target,
   RefreshCw
 } from 'lucide-react'
 import { useRealTimeMetrics } from '@/hooks/use-metrics'
 import { useSidebarControls } from '@/contexts/sidebar-controls-context'
+import { useCampaign } from '@/contexts/campaign-context'
 import { DashboardControls } from '@/components/ui/dashboard-controls'
 import { InteractiveLineChart } from '@/components/charts/interactive-line-chart'
 import { InteractiveHorizontalBarChart } from '@/components/charts/interactive-horizontal-bar-chart'
@@ -16,10 +17,29 @@ import { ConversionFunnel } from '@/components/charts/conversion-funnel'
 import UrgencyMatrixFull from '@/components/ui/urgency-matrix-full'
 import { DateRangeOption } from '@/components/ui/date-range-filter'
 
+interface ExternalQuadrant { id: number; count: number; percentage: number }
+
 export default function InsightsPage() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
-  const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(selectedDays)
+  const { selectedCampaign } = useCampaign()
+
+  const campaignStart = selectedCampaign?.data_inicio ?? undefined
+  const campaignEnd   = selectedCampaign?.data_fim   ?? undefined
+
+  const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(
+    selectedDays,
+    campaignStart,
+    campaignEnd,
+    selectedCampaign?.utm_campaign ?? undefined,
+    selectedCampaign?.ac_tag_id ?? undefined,
+    selectedCampaign?.sendflow_campaign_id ?? undefined
+  )
   const { setControls } = useSidebarControls()
+
+  // Reset date filter when campaign changes
+  useEffect(() => {
+    setSelectedDays(9999)
+  }, [selectedCampaign?.id])
 
   // Calcula o número real de dias desde o primeiro lead
   const calcularDiasReais = () => {
@@ -78,7 +98,13 @@ export default function InsightsPage() {
                   <p className="text-3xl font-bold text-white">
                     {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
                   </p>
-                  <p className="text-xs text-white/70">Total geral (ActiveCampaign)</p>
+                  <p className="text-xs text-white/70">
+                    {selectedCampaign?.ac_tag_id
+                      ? `ActiveCampaign (tag ${selectedCampaign.ac_tag_id})`
+                      : selectedCampaign?.utm_campaign
+                        ? `UTM: ${selectedCampaign.utm_campaign} (Supabase)`
+                        : 'Total geral (ActiveCampaign)'}
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -334,7 +360,10 @@ export default function InsightsPage() {
                   </div>
                 </div>
               ) : (
-                <UrgencyMatrixFull refreshKey={selectedDays} />
+                <UrgencyMatrixFull
+                  externalData={metrics?.quadrants as ExternalQuadrant[] | undefined}
+                  externalTotal={metrics?.totalDiagnosticos}
+                />
               )}
             </CardContent>
           </Card>
@@ -402,7 +431,7 @@ export default function InsightsPage() {
                       color: mapped.color
                     }
                   }) || []}
-                  totalLeads={metrics?.totalLeads}
+                  totalLeads={metrics?.totalDiagnosticos}
                 />
               )}
             </CardContent>

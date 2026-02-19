@@ -4,12 +4,29 @@ import { QUADRANTES } from '@/lib/constants'
 import { useUrgencyMatrix } from '@/hooks/use-urgency-matrix'
 import { motion } from 'framer-motion'
 
-interface UrgencyMatrixFullProps {
-  refreshKey?: number
+interface ExternalQuadrant {
+  id: number
+  count: number
+  percentage: number
 }
 
-export default function UrgencyMatrixFull({ refreshKey }: UrgencyMatrixFullProps = {}) {
-  const { quadrants, total, loading, error } = useUrgencyMatrix(refreshKey)
+interface UrgencyMatrixFullProps {
+  refreshKey?: number
+  /** Dados já filtrados vindos da API de métricas. Quando fornecidos, ignora o fetch próprio. */
+  externalData?: ExternalQuadrant[]
+  externalTotal?: number
+}
+
+export default function UrgencyMatrixFull({ refreshKey, externalData, externalTotal }: UrgencyMatrixFullProps = {}) {
+  const fetched = useUrgencyMatrix(externalData ? undefined : refreshKey)
+
+  // Se dados externos fornecidos, mapeia para o formato interno
+  const quadrants = externalData
+    ? externalData.map(q => ({ quadrante: q.id, count: q.count, percentage: q.percentage }))
+    : fetched.quadrants
+  const total     = externalData ? (externalTotal ?? externalData.reduce((s, q) => s + q.count, 0)) : fetched.total
+  const loading   = externalData ? false : fetched.loading
+  const error     = externalData ? null  : fetched.error
 
   if (error) {
     const isEnvError = error.includes('Supabase') || error.includes('configurado')
