@@ -5,13 +5,15 @@ import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
 import { Badge } from "../../components/ui/badge"
 import { motion } from "framer-motion"
-import { 
-  Search, Filter, Download, Flame, ChevronDown, ChevronUp, 
+import {
+  Search, Filter, Download, Flame, ChevronDown, ChevronUp,
   SortAsc, SortDesc, Users, Target, X
 } from "lucide-react"
 import { supabase } from '../../lib/supabase'
 import { ELEMENTOS_MTC } from '../../lib/constants'
 import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
+import { DateRangeFilter, DateRangeOption } from '../../components/ui/date-range-filter'
+import { nowInBRT } from '../../lib/utils'
 
 interface Lead {
   id: string
@@ -55,7 +57,17 @@ function LeadsPageContent() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const LEADS_POR_PAGINA = 50
+
+  const getCutoffIso = () => {
+    if (selectedDays >= 9999) return null
+    const now = nowInBRT()
+    const cutoff = new Date(now)
+    cutoff.setDate(cutoff.getDate() - selectedDays)
+    cutoff.setHours(0, 0, 0, 0)
+    return cutoff.toISOString()
+  }
 
   useEffect(() => {
     setIsMounted(true)
@@ -103,9 +115,9 @@ function LeadsPageContent() {
   // Watch for filter changes and trigger server-side search
   useEffect(() => {
     if (!isMounted) return
-    
+
     const hasActiveFilters = filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP || filtroAluno !== 'TODOS' || filtroAlunoBNY !== 'TODOS'
-    
+
     if (hasActiveFilters || searchTerm.trim() !== '') {
       const handler = setTimeout(() => {
         buscarComFiltros()
@@ -114,13 +126,15 @@ function LeadsPageContent() {
     } else {
       // No filters active, load paginated results
       carregarLeads()
+      buscarTotalSupabase()
     }
-  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, isMounted])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, selectedDays, isMounted])
 
   const buscarComFiltros = async () => {
     try {
       setLoadingSearch(true)
-      
+
       // Query para dados
       let query = supabase
         .from('quiz_leads')
@@ -131,6 +145,13 @@ function LeadsPageContent() {
       let countQuery = supabase
         .from('quiz_leads')
         .select('*', { count: 'exact', head: true })
+
+      // Apply date filter
+      const cutoff = getCutoffIso()
+      if (cutoff) {
+        query = query.gte('created_at', cutoff)
+        countQuery = countQuery.gte('created_at', cutoff)
+      }
 
       // Apply search term if exists
       if (searchTerm.trim() !== '') {
@@ -195,10 +216,12 @@ function LeadsPageContent() {
 
   const buscarTotalSupabase = async () => {
     try {
-      const { count, error } = await supabase
+      let query = supabase
         .from('quiz_leads')
         .select('*', { count: 'exact', head: true })
-      
+      const cutoff = getCutoffIso()
+      if (cutoff) query = query.gte('created_at', cutoff)
+      const { count, error } = await query
       if (error) throw error
       setTotalLeads(count || 0)
     } catch (error) {
@@ -209,12 +232,15 @@ function LeadsPageContent() {
   const carregarLeads = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      setIsSearching(false)
+      let query = supabase
         .from('quiz_leads')
         .select('*')
         .order('created_at', { ascending: false })
         .range(0, LEADS_POR_PAGINA - 1)
-      
+      const cutoff = getCutoffIso()
+      if (cutoff) query = query.gte('created_at', cutoff)
+      const { data, error } = await query
       if (error) throw error
       setLeads(data || [])
       setPaginaAtual(1)
@@ -231,13 +257,14 @@ function LeadsPageContent() {
       const proximaPagina = paginaAtual + 1
       const inicio = (proximaPagina - 1) * LEADS_POR_PAGINA
       const fim = inicio + LEADS_POR_PAGINA - 1
-      
-      const { data, error } = await supabase
+      let query = supabase
         .from('quiz_leads')
         .select('*')
         .order('created_at', { ascending: false })
         .range(inicio, fim)
-      
+      const cutoff = getCutoffIso()
+      if (cutoff) query = query.gte('created_at', cutoff)
+      const { data, error } = await query
       if (error) throw error
       setLeads(prev => [...prev, ...(data || [])])
       setPaginaAtual(proximaPagina)
@@ -401,13 +428,21 @@ function LeadsPageContent() {
                     Gestão de Leads (Respondentes Diagnóstico)
                   </CardTitle>
                 </div>
-                <button
-                  onClick={exportarCSV}
-                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
-                >
-                  <Download className="w-5 h-5" />
-                  Exportar CSV
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="w-44">
+                    <DateRangeFilter
+                      selected={selectedDays}
+                      onChange={(days) => setSelectedDays(days)}
+                    />
+                  </div>
+                  <button
+                    onClick={exportarCSV}
+                    className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
+                  >
+                    <Download className="w-5 h-5" />
+                    Exportar CSV
+                  </button>
+                </div>
               </div>
             </CardHeader>
 
