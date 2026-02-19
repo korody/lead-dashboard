@@ -5,6 +5,7 @@ export interface Campaign {
   meta_leads: number
   data_inicio: string | null // YYYY-MM-DD
   data_fim: string | null    // YYYY-MM-DD
+  utm_campaign: string | null // Rastreia leads por origem (ex: "bny2", "qgs1", "dex")
   ativo: boolean
   created_at: string
 }

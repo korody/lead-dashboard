@@ -12,6 +12,7 @@ export default function AdminPage() {
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [leadCounts, setLeadCounts] = useState<Record<string, number>>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<Campaign>>({})
   const [isLoading, setIsLoading] = useState(false)
@@ -42,13 +43,21 @@ export default function AdminPage() {
 
   const loadCampaigns = async () => {
     try {
-      const { data, error } = await supabase
-        .from('dash_campaigns')
-        .select('*')
-        .order('created_at')
+      const [campaignsResult, leadsResult] = await Promise.all([
+        supabase.from('dash_campaigns').select('*').order('created_at'),
+        supabase.from('quiz_leads').select('utm_campaign').not('utm_campaign', 'is', null)
+      ])
 
-      if (error) throw error
-      setCampaigns(data ?? [])
+      if (campaignsResult.error) throw campaignsResult.error
+      setCampaigns(campaignsResult.data ?? [])
+
+      // Conta leads por utm_campaign
+      const counts: Record<string, number> = {}
+      leadsResult.data?.forEach(lead => {
+        const utm = lead.utm_campaign as string
+        counts[utm] = (counts[utm] || 0) + 1
+      })
+      setLeadCounts(counts)
     } catch (error) {
       console.error('Erro ao carregar campanhas:', error)
       toast.error('Erro ao carregar campanhas')
@@ -73,6 +82,7 @@ export default function AdminPage() {
           meta_leads: editForm.meta_leads,
           data_inicio: editForm.data_inicio,
           data_fim: editForm.data_fim,
+          utm_campaign: editForm.utm_campaign,
           ativo: editForm.ativo,
         })
         .eq('id', editingId)
@@ -118,6 +128,7 @@ export default function AdminPage() {
         meta_leads: 10000,
         data_inicio: null,
         data_fim: null,
+        utm_campaign: null,
         ativo: true,
       })
 
@@ -236,10 +247,13 @@ export default function AdminPage() {
                     Nome
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                    Slug
+                    UTM Campaign
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                    Meta de Leads
+                    Total de Leads
+                  </th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                    Meta
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                     Data Início
@@ -248,7 +262,7 @@ export default function AdminPage() {
                     Data Fim
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                    Ativo
+                    Status
                   </th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white">
                     Ações
@@ -273,8 +287,22 @@ export default function AdminPage() {
                             className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white"
                           />
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {campaign.slug}
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            placeholder="ex: bny2, qgs1, dex"
+                            value={editForm.utm_campaign ?? ''}
+                            onChange={(e) =>
+                              setEditForm({
+                                ...editForm,
+                                utm_campaign: e.target.value || null,
+                              })
+                            }
+                            className="px-2 py-1 border rounded dark:bg-gray-900 dark:text-white text-sm w-28"
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-gray-400 text-sm">
+                          {campaign.utm_campaign ? (leadCounts[campaign.utm_campaign] ?? 0).toLocaleString('pt-BR') : '-'}
                         </td>
                         <td className="px-6 py-4">
                           <input
@@ -352,9 +380,30 @@ export default function AdminPage() {
                           {campaign.nome}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
-                          {campaign.slug}
+                          {campaign.utm_campaign ? (
+                            <code className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded text-xs">
+                              {campaign.utm_campaign}
+                            </code>
+                          ) : (
+                            '-'
+                          )}
                         </td>
-                        <td className="px-6 py-4 text-gray-900 dark:text-white">
+                        <td className="px-6 py-4">
+                          {campaign.utm_campaign ? (
+                            <div className="flex flex-col">
+                              <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                                {(leadCounts[campaign.utm_campaign] ?? 0).toLocaleString('pt-BR')}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                de {campaign.meta_leads.toLocaleString('pt-BR')}
+                                {' '}({Math.round((leadCounts[campaign.utm_campaign] ?? 0) / campaign.meta_leads * 100)}%)
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-gray-900 dark:text-white text-sm">
                           {campaign.meta_leads.toLocaleString('pt-BR')}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">

@@ -198,6 +198,12 @@ function LeadsPageContent() {
         countQuery = countQuery.lte('created_at', endCutoff)
       }
 
+      // Apply campaign UTM filter - filter by campaign origin
+      if (selectedCampaign?.utm_campaign) {
+        query = query.eq('utm_campaign', selectedCampaign.utm_campaign)
+        countQuery = countQuery.eq('utm_campaign', selectedCampaign.utm_campaign)
+      }
+
       // Apply search term if exists
       if (searchTerm.trim() !== '') {
         const like = `%${searchTerm.trim()}%`
@@ -268,6 +274,7 @@ function LeadsPageContent() {
       if (cutoff) query = query.gte('created_at', cutoff)
       const endCutoff = getEndCutoffIso()
       if (endCutoff) query = query.lte('created_at', endCutoff)
+      if (selectedCampaign?.utm_campaign) query = query.eq('utm_campaign', selectedCampaign.utm_campaign)
       const { count, error } = await query
       if (error) throw error
       setTotalLeads(count || 0)
@@ -289,6 +296,7 @@ function LeadsPageContent() {
       if (cutoff) query = query.gte('created_at', cutoff)
       const endCutoff = getEndCutoffIso()
       if (endCutoff) query = query.lte('created_at', endCutoff)
+      if (selectedCampaign?.utm_campaign) query = query.eq('utm_campaign', selectedCampaign.utm_campaign)
       const { data, error } = await query
       if (error) throw error
       setLeads(data || [])
@@ -315,6 +323,7 @@ function LeadsPageContent() {
       if (cutoff) query = query.gte('created_at', cutoff)
       const endCutoff = getEndCutoffIso()
       if (endCutoff) query = query.lte('created_at', endCutoff)
+      if (selectedCampaign?.utm_campaign) query = query.eq('utm_campaign', selectedCampaign.utm_campaign)
       const { data, error } = await query
       if (error) throw error
       setLeads(prev => [...prev, ...(data || [])])
