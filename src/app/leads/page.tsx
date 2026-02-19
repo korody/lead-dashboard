@@ -14,6 +14,7 @@ import { ELEMENTOS_MTC } from '../../lib/constants'
 import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
 import { DateRangeFilter, DateRangeOption } from '../../components/ui/date-range-filter'
 import { nowInBRT } from '../../lib/utils'
+import { useSidebarControls } from '../../contexts/sidebar-controls-context'
 
 interface Lead {
   id: string
@@ -58,7 +59,22 @@ function LeadsPageContent() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
+  const { setControls } = useSidebarControls()
   const LEADS_POR_PAGINA = 50
+
+  // Inject time filter into sidebar (same pattern as Insights page)
+  useEffect(() => {
+    setControls(
+      <div className="w-full">
+        <DateRangeFilter
+          selected={selectedDays}
+          onChange={(days) => setSelectedDays(days)}
+        />
+      </div>
+    )
+    return () => setControls(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDays])
 
   const getCutoffIso = () => {
     if (selectedDays >= 9999) return null
@@ -471,14 +487,6 @@ function LeadsPageContent() {
                     Filtros Avançados
                     {mostrarFiltros ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                   </button>
-
-                  <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
-                  <div className="w-44">
-                    <DateRangeFilter
-                      selected={selectedDays}
-                      onChange={(days) => setSelectedDays(days)}
-                    />
-                  </div>
 
                   {(filtroElemento !== 'TODOS' || filtroPrioridade !== 'TODOS' || filtroQuadrante !== 'TODOS' || filtroVIP || filtroAluno !== 'TODOS' || filtroAlunoBNY !== 'TODOS') && (
                     <>
