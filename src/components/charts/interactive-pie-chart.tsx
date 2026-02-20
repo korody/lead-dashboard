@@ -1,6 +1,6 @@
 'use client'
 
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, type PieLabelRenderProps } from 'recharts'
 import { motion } from 'framer-motion'
 import { useState } from 'react'
 
@@ -160,7 +160,7 @@ function PieCustomTooltip(props: unknown) {
   return null
 }
 
-function PieCustomLabel(props: Record<string, unknown>) {
+function PieCustomLabel(props: PieLabelRenderProps) {
   const cx = typeof props.cx === 'number' ? props.cx : 0
   const cy = typeof props.cy === 'number' ? props.cy : 0
   const midAngle = typeof props.midAngle === 'number' ? props.midAngle : 0

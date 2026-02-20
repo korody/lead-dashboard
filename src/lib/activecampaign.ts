@@ -263,9 +263,17 @@ export class ActiveCampaignClient {
           }
         }
         
-        // SÓ PROCESSAR se tiver campo 150 (data real do evento BNY2)
+        // Fallback para cdate do contato quando campo 150 não está preenchido
         if (!cadastroDate || isNaN(cadastroDate.getTime())) {
-          return // Pula contatos sem campo 150
+          const cdateStr = String((contact as { cdate?: string }).cdate || '')
+          if (cdateStr) {
+            cadastroDate = new Date(cdateStr)
+          }
+        }
+
+        // Pular se ainda não tiver nenhuma data válida
+        if (!cadastroDate || isNaN(cadastroDate.getTime())) {
+          return
         }
         
         // Debug: Log dos primeiros contatos de hoje
@@ -295,6 +303,114 @@ export class ActiveCampaignClient {
       console.error('Error fetching recent contacts:', err)
       return { total: 0, byDay: {} }
     }
+  }
+
+  getCustomFields = async (): Promise<Array<{ id: string; title: string; type: string }>> => {
+    if (!this.isConfigured()) return []
+    try {
+      const url = `${this.baseUrl}/api/3/fields?limit=100`
+      const response = await fetch(url, {
+        headers: { 'Api-Token': this.apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) return []
+      const data = await response.json()
+      return (data.fields || []).map((f: { id: string; title: string; type: string }) => ({
+        id: f.id,
+        title: f.title,
+        type: f.type,
+      }))
+    } catch {
+      return []
+    }
+  }
+
+  getFieldValues = async (fieldId: number): Promise<Map<string, string>> => {
+    const map = new Map<string, string>()
+    if (!this.isConfigured()) return map
+
+    let offset = 0
+    const limit = 100
+
+    while (true) {
+      const url = `${this.baseUrl}/api/3/fieldValues?filters[fieldid]=${fieldId}&limit=${limit}&offset=${offset}`
+      const response = await fetch(url, {
+        headers: { 'Api-Token': this.apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) break
+
+      const data = await response.json()
+      const fieldValues: Array<{ contact: string; value: string }> = data.fieldValues || []
+      if (fieldValues.length === 0) break
+
+      fieldValues.forEach(fv => {
+        if (fv.contact && fv.value) map.set(fv.contact, fv.value)
+      })
+
+      const total = parseInt(data.meta?.total || '0', 10)
+      if (map.size >= total) break
+      offset += limit
+    }
+
+    return map
+  }
+
+  getContactsWithUtms = async (
+    tagId: number,
+    utmFieldIds: { campaign?: number; source?: number; medium?: number; content?: number; term?: number }
+  ): Promise<Array<{
+    contactId: string
+    email: string
+    utm_campaign: string | null
+    utm_source: string | null
+    utm_medium: string | null
+    utm_content: string | null
+    utm_term: string | null
+  }>> => {
+    if (!this.isConfigured()) return []
+
+    const [campaignMap, sourceMap, mediumMap, contentMap, termMap] = await Promise.all([
+      utmFieldIds.campaign ? this.getFieldValues(utmFieldIds.campaign) : Promise.resolve(new Map<string, string>()),
+      utmFieldIds.source   ? this.getFieldValues(utmFieldIds.source)   : Promise.resolve(new Map<string, string>()),
+      utmFieldIds.medium   ? this.getFieldValues(utmFieldIds.medium)   : Promise.resolve(new Map<string, string>()),
+      utmFieldIds.content  ? this.getFieldValues(utmFieldIds.content)  : Promise.resolve(new Map<string, string>()),
+      utmFieldIds.term     ? this.getFieldValues(utmFieldIds.term)     : Promise.resolve(new Map<string, string>()),
+    ])
+
+    const allContacts: Array<Record<string, unknown>> = []
+    let offset = 0
+    const limit = 100
+
+    while (true) {
+      const url = `${this.baseUrl}/api/3/contacts?tagid=${tagId}&limit=${limit}&offset=${offset}`
+      const response = await fetch(url, {
+        headers: { 'Api-Token': this.apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!response.ok) break
+
+      const data = await response.json()
+      const contacts: Array<Record<string, unknown>> = data.contacts || []
+      if (contacts.length === 0) break
+
+      allContacts.push(...contacts)
+
+      const total = parseInt(data.meta?.total || '0', 10)
+      if (allContacts.length >= total) break
+      offset += limit
+    }
+
+    return allContacts.map(c => {
+      const id = String((c as { id?: string }).id || '')
+      const email = String((c as { email?: string }).email || '')
+      return {
+        contactId: id,
+        email,
+        utm_campaign: campaignMap.get(id) ?? null,
+        utm_source:   sourceMap.get(id)   ?? null,
+        utm_medium:   mediumMap.get(id)   ?? null,
+        utm_content:  contentMap.get(id)  ?? null,
+        utm_term:     termMap.get(id)     ?? null,
+      }
+    })
   }
 }
 

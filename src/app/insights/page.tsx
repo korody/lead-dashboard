@@ -17,14 +17,39 @@ import { ConversionFunnel } from '@/components/charts/conversion-funnel'
 import UrgencyMatrixFull from '@/components/ui/urgency-matrix-full'
 import { DateRangeOption } from '@/components/ui/date-range-filter'
 import { CampaignComparisonSelector } from '@/components/ui/campaign-comparison-selector'
+import { InteractiveHorizontalBarChart } from '@/components/charts/interactive-horizontal-bar-chart'
 
 interface ExternalQuadrant { id: number; count: number; percentage: number }
+
+interface UtmRow {
+  utmValue: string
+  count: number
+  avgScore: number
+  vipRate: number
+  q1Rate: number
+  altaRate: number
+}
+
+function utmScoreColor(score: number): string {
+  if (score >= 65) return '#22c55e'
+  if (score >= 50) return '#eab308'
+  return '#ef4444'
+}
+
+function utmScoreTextClass(score: number): string {
+  if (score >= 65) return 'text-green-400'
+  if (score >= 50) return 'text-yellow-400'
+  return 'text-red-400'
+}
 
 export default function InsightsPage() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const [customStart, setCustomStart] = useState<string>('')
   const [customEnd, setCustomEnd] = useState<string>('')
   const [selectedComparisonCampaignId, setSelectedComparisonCampaignId] = useState<string | null>(null)
+  const [utmData, setUtmData] = useState<UtmRow[]>([])
+  const [utmLoading, setUtmLoading] = useState(false)
+  const [utmDimension, setUtmDimension] = useState<'campaign' | 'source' | 'medium' | 'content' | 'term'>('campaign')
   const { selectedCampaign, campaigns } = useCampaign()
 
   const campaignStart = selectedCampaign?.data_inicio ?? undefined
@@ -46,6 +71,28 @@ export default function InsightsPage() {
     selectedCampaign?.ac_tag_id ?? undefined,
     selectedCampaign?.sendflow_campaign_id ?? undefined
   )
+
+  // Fetch UTM quality analysis
+  useEffect(() => {
+    async function fetchUtm() {
+      setUtmLoading(true)
+      try {
+        const params = new URLSearchParams()
+        if (startDate) params.set('startDate', startDate)
+        if (endDate) params.set('endDate', endDate)
+        if (selectedCampaign?.utm_campaign) params.set('utmCampaignFilter', selectedCampaign.utm_campaign)
+        params.set('dimension', utmDimension)
+        const res = await fetch(`/api/utm-analysis?${params}`)
+        const json = await res.json()
+        setUtmData(json.data || [])
+      } catch {
+        setUtmData([])
+      } finally {
+        setUtmLoading(false)
+      }
+    }
+    fetchUtm()
+  }, [startDate, endDate, selectedCampaign?.utm_campaign, utmDimension])
 
   // Get comparison campaign data
   const comparisonCampaign = selectedComparisonCampaignId
@@ -602,6 +649,120 @@ export default function InsightsPage() {
                   externalData={metrics?.quadrants as ExternalQuadrant[] | undefined}
                   externalTotal={metrics?.totalDiagnosticos}
                 />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* ===== QUALIDADE POR UTM ===== */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.7 }}
+        >
+          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                    📊 Qualidade por UTM
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Score médio, VIPs e leads críticos por origem — rankeados por qualidade
+                  </p>
+                </div>
+                {/* Dimension selector */}
+                <div className="flex flex-wrap gap-1">
+                  {(['campaign', 'source', 'medium', 'content', 'term'] as const).map(dim => (
+                    <button
+                      key={dim}
+                      onClick={() => setUtmDimension(dim)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        utmDimension === dim
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-transparent text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-500'
+                      }`}
+                    >
+                      {dim.charAt(0).toUpperCase() + dim.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {utmLoading ? (
+                <div className="flex items-center gap-2 py-8 justify-center">
+                  <RefreshCw className="h-5 w-5 text-indigo-500 animate-spin" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">Carregando análise UTM...</span>
+                </div>
+              ) : utmData.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">
+                  Nenhum dado UTM encontrado para o período selecionado.
+                </p>
+              ) : (
+                <div className="space-y-8">
+                  {/* Tabela rankeada */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                          <th className="text-left py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">#</th>
+                          <th className="text-left py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">UTM {utmDimension.charAt(0).toUpperCase() + utmDimension.slice(1)}</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Leads</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Score Médio</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">VIPs</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Q1 (Críticos)</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Prioridade ALTA</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {utmData.map((row, i) => (
+                          <tr
+                            key={row.utmValue}
+                            className="border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                          >
+                            <td className="py-2 px-3 text-xs text-gray-400">{i + 1}</td>
+                            <td className="py-2 px-3 font-medium text-gray-900 dark:text-white max-w-[200px] truncate">
+                              {row.utmValue}
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-700 dark:text-gray-300">
+                              {row.count.toLocaleString('pt-BR')}
+                            </td>
+                            <td className={`py-2 px-3 text-right font-bold ${utmScoreTextClass(row.avgScore)}`}>
+                              {row.avgScore.toFixed(1)}
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-700 dark:text-gray-300">
+                              {row.vipRate.toFixed(1)}%
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-700 dark:text-gray-300">
+                              {row.q1Rate.toFixed(1)}%
+                            </td>
+                            <td className="py-2 px-3 text-right text-gray-700 dark:text-gray-300">
+                              {row.altaRate.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Gráfico horizontal: Score Médio por UTM */}
+                  {utmData.length > 1 && (
+                    <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
+                      <InteractiveHorizontalBarChart
+                        title={`Score Médio por UTM ${utmDimension.charAt(0).toUpperCase() + utmDimension.slice(1)}`}
+                        subtitle={`${utmData.length} origens distintas`}
+                        data={utmData.slice(0, 20).map(row => ({
+                          name: row.utmValue,
+                          value: row.avgScore,
+                          percentage: row.avgScore, // reutiliza como label
+                          color: utmScoreColor(row.avgScore),
+                        }))}
+                        totalLeads={100} // escala 0-100 para score
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
