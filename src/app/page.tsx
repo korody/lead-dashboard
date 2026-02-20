@@ -214,9 +214,11 @@ export default function HomePage() {
                     <p className="text-3xl font-bold text-white">
                       {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
                     </p>
-                    <p className="text-sm text-white/70 text-right">
-                      {isLoading ? '...' : `${((metrics?.totalLeads || 0) / campaignGoal * 100).toFixed(1)}% da meta`}
-                    </p>
+                    {selectedCampaign && (
+                      <p className="text-sm text-white/70 text-right">
+                        {isLoading ? '...' : `${((metrics?.totalLeads || 0) / campaignGoal * 100).toFixed(1)}% da meta`}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -287,7 +289,8 @@ export default function HomePage() {
 
         </div>
 
-        {/* Campaign Goal Progress Card */}
+        {/* Campaign Goal Progress Card - Only show when a specific campaign is selected */}
+        {selectedCampaign && (
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -415,6 +418,7 @@ export default function HomePage() {
             </CardContent>
           </Card>
         </motion.div>
+        )}
 
         {/* Interactive Timeline Chart - Evolução Temporal */}
         <motion.div

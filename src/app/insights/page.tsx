@@ -149,9 +149,11 @@ export default function InsightsPage() {
                     <p className="text-3xl font-bold text-white">
                       {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
                     </p>
-                    <p className="text-sm text-white/70 text-right">
-                      {isLoading ? '...' : `${((metrics?.totalLeads || 0) / (selectedCampaign?.meta_leads ?? 10000) * 100).toFixed(1)}% da meta`}
-                    </p>
+                    {selectedCampaign && (
+                      <p className="text-sm text-white/70 text-right">
+                        {isLoading ? '...' : `${((metrics?.totalLeads || 0) / (selectedCampaign?.meta_leads ?? 10000) * 100).toFixed(1)}% da meta`}
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
