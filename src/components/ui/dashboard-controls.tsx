@@ -10,6 +10,11 @@ interface DashboardControlsProps {
   isRealTimeEnabled: boolean
   onToggleRealTime: () => void
   onRefresh: () => void
+  campaignStart?: string
+  campaignEnd?: string
+  customStart?: string
+  customEnd?: string
+  onCustomDatesChange?: (start: string, end: string) => void
 }
 
 export function DashboardControls({
@@ -17,7 +22,12 @@ export function DashboardControls({
   onDaysChange,
   isRealTimeEnabled,
   onToggleRealTime,
-  onRefresh
+  onRefresh,
+  campaignStart,
+  campaignEnd,
+  customStart,
+  customEnd,
+  onCustomDatesChange,
 }: DashboardControlsProps) {
   return (
     <div className="space-y-3">
@@ -26,6 +36,11 @@ export function DashboardControls({
         <DateRangeFilter
           selected={selectedDays}
           onChange={onDaysChange}
+          campaignStart={campaignStart}
+          campaignEnd={campaignEnd}
+          customStart={customStart}
+          customEnd={customEnd}
+          onCustomDatesChange={onCustomDatesChange}
         />
       </div>
 

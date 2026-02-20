@@ -84,8 +84,8 @@ function LeadsPageContent() {
   }, [selectedDays])
 
   const getCutoffIso = () => {
-    if (selectedDays >= 9999) {
-      // When showing all time, use campaign's start date if available
+    if (selectedDays === 'custom' || (typeof selectedDays === 'number' && selectedDays >= 9999)) {
+      // When showing all time or custom range, use campaign's start date if available
       if (selectedCampaign?.data_inicio) {
         return new Date(`${selectedCampaign.data_inicio}T00:00:00-03:00`).toISOString()
       }
@@ -93,7 +93,7 @@ function LeadsPageContent() {
     }
     const now = nowInBRT()
     const cutoff = new Date(now)
-    cutoff.setDate(cutoff.getDate() - selectedDays)
+    cutoff.setDate(cutoff.getDate() - (selectedDays as number))
     cutoff.setHours(0, 0, 0, 0)
     return cutoff.toISOString()
   }

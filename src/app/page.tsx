@@ -13,21 +13,27 @@ import { useSidebarControls } from '@/contexts/sidebar-controls-context'
 import { useCampaign } from '@/contexts/campaign-context'
 import { DashboardControls } from '@/components/ui/dashboard-controls'
 import { InteractiveLineChart } from '@/components/charts/interactive-line-chart'
-import { InteractiveHorizontalBarChart } from '@/components/charts/interactive-horizontal-bar-chart'
+import { ScoreEvolutionChart } from '@/components/charts/score-evolution-chart'
 import { ConversionFunnel } from '@/components/charts/conversion-funnel'
 import UrgencyMatrixFull from '@/components/ui/urgency-matrix-full'
 import { DateRangeOption } from '@/components/ui/date-range-filter'
 import { StoicLoadingOverlay } from '@/components/ui/stoic-loading-overlay'
+import { CampaignComparisonSelector } from '@/components/ui/campaign-comparison-selector'
 
 export default function HomePage() {
-  const { selectedCampaign } = useCampaign()
+  const { selectedCampaign, campaigns } = useCampaign()
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const [showLoadingOverlay, setShowLoadingOverlay] = useState(true)
+  const [customStart, setCustomStart] = useState<string>('')
+  const [customEnd, setCustomEnd] = useState<string>('')
+  const [selectedComparisonCampaignId, setSelectedComparisonCampaignId] = useState<string | null>(null)
 
   // Pre-fill date filter when campaign changes
   useEffect(() => {
     if (selectedCampaign) {
       setSelectedDays(9999)
+      setCustomStart('')
+      setCustomEnd('')
     }
   }, [selectedCampaign?.id])
 
@@ -35,13 +41,38 @@ export default function HomePage() {
   const campaignStart = selectedCampaign?.data_inicio ?? undefined
   const campaignEnd = selectedCampaign?.data_fim ?? undefined
 
+  // Derive startDate/endDate based on selectedDays mode
+  const startDate = selectedDays === 'custom'
+    ? (customStart || undefined)
+    : selectedDays === 9999 ? campaignStart : undefined
+  const endDate = selectedDays === 'custom'
+    ? (customEnd || undefined)
+    : selectedDays === 9999 ? campaignEnd : undefined
+
   const { data: metrics, isLoading, refresh, isRealTimeEnabled, toggleRealTime } = useRealTimeMetrics(
     selectedDays,
-    campaignStart,
-    campaignEnd,
+    startDate,
+    endDate,
     selectedCampaign?.utm_campaign ?? undefined,
     selectedCampaign?.ac_tag_id ?? undefined,
     selectedCampaign?.sendflow_campaign_id ?? undefined
+  )
+
+  // Get comparison campaign data
+  const comparisonCampaign = selectedComparisonCampaignId
+    ? campaigns.find(c => c.id === selectedComparisonCampaignId)
+    : null
+
+  const comparisonStart = comparisonCampaign?.data_inicio ?? undefined
+  const comparisonEnd = comparisonCampaign?.data_fim ?? undefined
+
+  const { data: comparisonMetrics, isLoading: comparisonIsLoading } = useRealTimeMetrics(
+    selectedDays,
+    selectedDays === 9999 ? comparisonStart : undefined,
+    selectedDays === 9999 ? comparisonEnd : undefined,
+    comparisonCampaign?.utm_campaign ?? undefined,
+    comparisonCampaign?.ac_tag_id ?? undefined,
+    comparisonCampaign?.sendflow_campaign_id ?? undefined
   )
   const { setControls } = useSidebarControls()
 
@@ -57,9 +88,9 @@ export default function HomePage() {
   }, [isLoading, metrics])
 
   // Calcula o número real de dias desde o primeiro lead
-  const calcularDiasReais = () => {
+  const calcularDiasReais = (): number => {
     if (!metrics?.evolucaoTemporal || metrics.evolucaoTemporal.length === 0) {
-      return selectedDays
+      return typeof selectedDays === 'number' ? selectedDays : 0
     }
     
     // Parse a primeira data como meia-noite BRT
@@ -75,7 +106,20 @@ export default function HomePage() {
     return diferencaDias
   }
 
-  const diasReais = selectedDays >= 9999 ? calcularDiasReais() : selectedDays
+  const diasReais = (selectedDays === 'custom' || (typeof selectedDays === 'number' && selectedDays >= 9999))
+    ? calcularDiasReais()
+    : (selectedDays as number)
+
+  // Calculate average score from daily evolution
+  const calculateAverageScore = (data: Array<{ data: string; avgScore: number }> | undefined): number => {
+    if (!data || data.length === 0) return 0
+    const validScores = data.filter(d => d.avgScore > 0).map(d => d.avgScore)
+    if (validScores.length === 0) return 0
+    return validScores.reduce((a, b) => a + b, 0) / validScores.length
+  }
+
+  const avgScoreFromEvolution = calculateAverageScore(metrics?.evolucaoScore)
+  const comparisonAvgScoreFromEvolution = calculateAverageScore(comparisonMetrics?.evolucaoScore)
 
   // Get campaign goal and deadline
   const campaignGoal = selectedCampaign?.meta_leads ?? 10000
@@ -124,12 +168,17 @@ export default function HomePage() {
         isRealTimeEnabled={isRealTimeEnabled}
         onToggleRealTime={toggleRealTime}
         onRefresh={refresh}
+        campaignStart={campaignStart}
+        campaignEnd={campaignEnd}
+        customStart={customStart}
+        customEnd={customEnd}
+        onCustomDatesChange={(s, e) => { setCustomStart(s); setCustomEnd(e) }}
       />
     )
-    
+
     return () => setControls(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDays, isRealTimeEnabled])
+  }, [selectedDays, isRealTimeEnabled, customStart, customEnd, campaignStart, campaignEnd])
 
   return (
     <>
@@ -143,7 +192,7 @@ export default function HomePage() {
       <div className="w-full min-h-screen transition-all duration-500">
         <div className="p-8 space-y-8">
           {/* Advanced Animated Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -159,18 +208,16 @@ export default function HomePage() {
                   </div>
                   <div className="w-3 h-3 rounded-full bg-white/40 animate-pulse" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p className="text-sm font-medium text-white/80">Total de Leads</p>
-                  <p className="text-3xl font-bold text-white">
-                    {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
-                  </p>
-                  <p className="text-xs text-white/70">
-                    {selectedCampaign?.ac_tag_id
-                      ? `ActiveCampaign (tag ${selectedCampaign.ac_tag_id})`
-                      : selectedCampaign?.utm_campaign
-                        ? `Diagnósticos UTM: ${selectedCampaign.utm_campaign} (Supabase)`
-                        : 'Total geral (ActiveCampaign)'}
-                  </p>
+                  <div className="flex items-end justify-between">
+                    <p className="text-3xl font-bold text-white">
+                      {isLoading ? '...' : (metrics?.totalLeads || 0).toLocaleString('pt-BR')}
+                    </p>
+                    <p className="text-sm text-white/70 text-right">
+                      {isLoading ? '...' : `${((metrics?.totalLeads || 0) / campaignGoal * 100).toFixed(1)}% da meta`}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -191,50 +238,26 @@ export default function HomePage() {
                   </div>
                   <div className="w-3 h-3 rounded-full bg-white/40 animate-pulse" />
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p className="text-sm font-medium text-white/80">Diagnósticos Finalizados</p>
-                  <p className="text-3xl font-bold text-white">
-                    {isLoading ? '...' : (metrics?.totalDiagnosticos || 0).toLocaleString('pt-BR')}
-                  </p>
-                  <p className="text-xs text-white/70">Quiz completado</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.2 }}
-            onClick={() => window.location.href = '/leads?vip=true'}
-            className="cursor-pointer"
-          >
-            <Card className="shadow-xl border-0 overflow-hidden group hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-cyan-500 to-blue-600">
-              <CardContent className="p-6 relative">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="p-3 rounded-xl bg-white/20 backdrop-blur-sm">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                  <div className="flex items-end justify-between">
+                    <p className="text-3xl font-bold text-white">
+                      {isLoading ? '...' : (metrics?.totalDiagnosticos || 0).toLocaleString('pt-BR')}
+                    </p>
+                    <p className="text-sm text-white/70 text-right">
+                      {isLoading ? '...' : `${((metrics?.totalDiagnosticos || 0) / (metrics?.totalLeads || 1) * 100).toFixed(1)}% do total de leads`}
+                    </p>
                   </div>
-                  <div className="w-3 h-3 rounded-full bg-white/40 animate-pulse" />
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-white/80">Leads VIP</p>
-                  <p className="text-3xl font-bold text-white">
-                    {isLoading ? '...' : (metrics?.hotVips || 0).toLocaleString('pt-BR')}
-                  </p>
-                  <p className="text-xs text-white/70">Score alto</p>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
 
-          {(selectedDays === 30 || selectedDays >= 9999) && (
+          {(selectedDays === 30 || selectedDays === 'custom' || (typeof selectedDays === 'number' && selectedDays >= 9999)) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.25 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
             >
               <Card className="shadow-xl border-0 overflow-hidden group hover:shadow-2xl transition-all duration-300 bg-gradient-to-br from-green-500 to-emerald-600">
                 <CardContent className="p-6 relative">
@@ -246,17 +269,22 @@ export default function HomePage() {
                     </div>
                     <div className="w-3 h-3 rounded-full bg-white/40 animate-pulse" />
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-white/80">Conversão Grupos</p>
-                    <p className="text-3xl font-bold text-white">
-                      {isLoading ? '...' : `${(metrics?.funil?.conversoes?.conversao_geral ? parseFloat(metrics.funil.conversoes.conversao_geral) : 0).toFixed(1)}%`}
-                    </p>
-                    <p className="text-xs text-white/70">Grupos Whatsapp (SendFlow)</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-white/80">Leads nos Grupos</p>
+                    <div className="flex items-end justify-between">
+                      <p className="text-3xl font-bold text-white">
+                        {isLoading ? '...' : (metrics?.funil?.etapas?.grupos_whatsapp || 0).toLocaleString('pt-BR')}
+                      </p>
+                      <p className="text-sm text-white/70 text-right">
+                        {isLoading ? '...' : `${(metrics?.funil?.conversoes?.conversao_geral ? parseFloat(metrics.funil.conversoes.conversao_geral) : 0).toFixed(1)}% de conversão`}
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
           )}
+
         </div>
 
         {/* Campaign Goal Progress Card */}
@@ -431,11 +459,218 @@ export default function HomePage() {
           </Card>
         </motion.div>
 
+        {/* ===== QUALIDADE DA CAPTAÇÃO ===== */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.32 }}
+        >
+          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                    📊 Qualidade da Captação
+                  </CardTitle>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Indicadores para avaliar a qualidade dos leads gerados</p>
+                </div>
+              </div>
+              {selectedComparisonCampaignId && (
+                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <CampaignComparisonSelector
+                    selectedComparison={selectedComparisonCampaignId}
+                    onComparisonChange={setSelectedComparisonCampaignId}
+                  />
+                </div>
+              )}
+              {!selectedComparisonCampaignId && (
+                <div className="mt-3">
+                  <CampaignComparisonSelector
+                    selectedComparison={selectedComparisonCampaignId}
+                    onComparisonChange={setSelectedComparisonCampaignId}
+                  />
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+
+              {/* KPI Cards - Normal or Comparison Mode */}
+              {!selectedComparisonCampaignId ? (
+                // Normal view: 3 KPI Cards
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Score Médio */}
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 text-center border border-amber-100 dark:border-amber-800/30">
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2 uppercase tracking-wide">Score Médio</p>
+                    <p className="text-3xl font-bold text-amber-700 dark:text-amber-300">
+                      {isLoading ? '...' : avgScoreFromEvolution.toFixed(1)}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">escala 0–100</p>
+                  </div>
+
+                  {/* Taxa de VIPs */}
+                  <div className="bg-cyan-50 dark:bg-cyan-900/20 rounded-xl p-4 text-center border border-cyan-100 dark:border-cyan-800/30">
+                    <p className="text-xs font-medium text-cyan-600 dark:text-cyan-400 mb-2 uppercase tracking-wide">Taxa de VIPs</p>
+                    <p className="text-3xl font-bold text-cyan-700 dark:text-cyan-300">
+                      {isLoading ? '...' : `${((metrics?.hotVips || 0) / Math.max(metrics?.totalDiagnosticos || 1, 1) * 100).toFixed(1)}%`}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {isLoading ? '...' : `${(metrics?.hotVips || 0).toLocaleString('pt-BR')} leads de alta qualidade`}
+                    </p>
+                  </div>
+
+                  {/* Leads Críticos Q1 */}
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 text-center border border-red-100 dark:border-red-800/30">
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-2 uppercase tracking-wide">Leads Críticos (Q1)</p>
+                    <p className="text-3xl font-bold text-red-700 dark:text-red-300">
+                      {isLoading ? '...' : `${(metrics?.quadrants?.find(q => q.id === 1)?.percentage || 0).toFixed(1)}%`}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {isLoading ? '...' : `${(metrics?.quadrants?.find(q => q.id === 1)?.count || 0).toLocaleString('pt-BR')} leads críticos`}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                // Comparison view
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                    {selectedCampaign?.nome} vs {comparisonCampaign?.nome}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Score Médio Comparison */}
+                    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Score Médio</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{selectedCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                            {isLoading ? '...' : avgScoreFromEvolution.toFixed(1)}
+                          </p>
+                        </div>
+                        <div className="w-px h-12 bg-gray-300 dark:bg-gray-600 mx-3" />
+                        <div className="flex-1 text-right">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{comparisonCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                            {comparisonIsLoading ? '...' : comparisonAvgScoreFromEvolution.toFixed(1)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Taxa VIP Comparison */}
+                    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Taxa de VIPs</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{selectedCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                            {isLoading ? '...' : `${((metrics?.hotVips || 0) / Math.max(metrics?.totalDiagnosticos || 1, 1) * 100).toFixed(1)}%`}
+                          </p>
+                        </div>
+                        <div className="w-px h-12 bg-gray-300 dark:bg-gray-600 mx-3" />
+                        <div className="flex-1 text-right">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{comparisonCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">
+                            {comparisonIsLoading ? '...' : `${((comparisonMetrics?.hotVips || 0) / Math.max(comparisonMetrics?.totalDiagnosticos || 1, 1) * 100).toFixed(1)}%`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Leads Críticos Q1 Comparison */}
+                    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3 uppercase tracking-wide">Leads Críticos (Q1)</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{selectedCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            {isLoading ? '...' : `${(metrics?.quadrants?.find(q => q.id === 1)?.percentage || 0).toFixed(1)}%`}
+                          </p>
+                        </div>
+                        <div className="w-px h-12 bg-gray-300 dark:bg-gray-600 mx-3" />
+                        <div className="flex-1 text-right">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{comparisonCampaign?.nome}</p>
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                            {comparisonIsLoading ? '...' : `${(comparisonMetrics?.quadrants?.find(q => q.id === 1)?.percentage || 0).toFixed(1)}%`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Score Evolution Chart */}
+              {!isLoading && metrics?.evolucaoScore && (
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                  <ScoreEvolutionChart data={metrics.evolucaoScore} />
+                </div>
+              )}
+
+              {/* Elemento × Qualidade Table */}
+              {!isLoading && metrics?.elementoQualidade && metrics.elementoQualidade.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Elemento × Qualidade</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
+                          <th className="text-left py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Elemento</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Leads</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">Score Médio</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">% VIP</th>
+                          <th className="text-right py-2 px-3 text-xs text-gray-500 dark:text-gray-400 font-medium">VIPs</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metrics.elementoQualidade.map((el) => {
+                          const config: Record<string, { emoji: string; color: string }> = {
+                            'RIM': { emoji: '🌊', color: 'text-cyan-600 dark:text-cyan-400' },
+                            'FÍGADO': { emoji: '🌳', color: 'text-green-600 dark:text-green-400' },
+                            'BAÇO': { emoji: '🌍', color: 'text-amber-600 dark:text-amber-400' },
+                            'CORAÇÃO': { emoji: '❤️', color: 'text-red-600 dark:text-red-400' },
+                            'PULMÃO': { emoji: '💨', color: 'text-slate-500 dark:text-slate-400' },
+                          }
+                          const { emoji, color } = config[el.elemento] ?? { emoji: '⭐', color: 'text-gray-600 dark:text-gray-400' }
+                          return (
+                            <tr key={el.elemento} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                              <td className={`py-3 px-3 font-medium ${color}`}>
+                                {emoji} {el.elemento}
+                              </td>
+                              <td className="text-right py-3 px-3 text-gray-700 dark:text-gray-300">
+                                {el.count.toLocaleString('pt-BR')}
+                              </td>
+                              <td className="text-right py-3 px-3">
+                                <span className={`font-bold ${el.avgScore >= 70 ? 'text-green-600 dark:text-green-400' : el.avgScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                                  {el.avgScore.toFixed(1)}
+                                </span>
+                              </td>
+                              <td className="text-right py-3 px-3">
+                                <span className={`font-medium ${el.vipRate >= 10 ? 'text-green-600 dark:text-green-400' : el.vipRate >= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                  {el.vipRate.toFixed(1)}%
+                                </span>
+                              </td>
+                              <td className="text-right py-3 px-3 text-gray-500 dark:text-gray-400">
+                                {el.vipCount}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Funil de Conversão Completo */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
+          className="hidden"
         >
           <Card className="shadow-2xl border-4 border-indigo-500 dark:border-indigo-400 bg-gray-50/50 dark:bg-gray-900/50">
             <CardHeader>
@@ -452,7 +687,7 @@ export default function HomePage() {
                   ))}
                 </div>
               ) : (
-                <ConversionFunnel data={metrics.funil} hideWhatsApp={selectedDays !== 30 && selectedDays < 9999} />
+                <ConversionFunnel data={metrics.funil} hideWhatsApp={selectedDays !== 30 && selectedDays !== 'custom' && (typeof selectedDays === 'number' && selectedDays < 9999)} />
               )}
             </CardContent>
           </Card>
@@ -555,80 +790,12 @@ export default function HomePage() {
                   </div>
                 </div>
               ) : (
-                <UrgencyMatrixFull refreshKey={selectedDays} />
+                <UrgencyMatrixFull refreshKey={typeof selectedDays === 'number' ? selectedDays : 0} />
               )}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Status no Funil - Horizontal Bar Chart */}
-        <motion.div
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-        >
-          <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
-            <CardContent className="p-6">
-              {isLoading || !metrics?.whatsappDistribution ? (
-                <div className="space-y-4">
-                  <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                  <div className="space-y-3">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="h-8 flex-1 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${100 - i * 15}%` }} />
-                        <div className="h-6 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <InteractiveHorizontalBarChart
-                  title="📱 Status no Funil"
-                  subtitle="Distribuição completa de todos os status"
-                  data={
-                  metrics.whatsappDistribution?.map((item) => {
-                    // Mapear status para nomes legíveis e cores.
-                    const normalize = (s: string) =>
-                      String(s || '')
-                        .trim()
-                        .toUpperCase()
-                        .normalize('NFD')
-                        .replace(/\p{Diacritic}/gu, '')
-
-                    const key = normalize(item.status)
-
-                    const statusMap: Record<string, { name: string; color: string }> = {
-                      'RESULTADOS_ENVIADOS': { name: 'Resultado Enviado', color: '#10b981' },
-                      'RESULTADOSENVIADOS': { name: 'Resultado Enviado', color: '#10b981' },
-                      'SENT': { name: 'Enviado', color: '#059669' },
-                      'DESAFIO_ENVIADO': { name: 'Desafio Enviado', color: '#34d399' },
-                      'DESAFIOENVIADO': { name: 'Desafio Enviado', color: '#34d399' },
-                      'PENDING': { name: 'Pendente', color: '#f59e0b' },
-                      'ERROR': { name: 'Erro', color: '#ef4444' },
-                      'FAILED': { name: 'Falhou', color: '#dc2626' },
-                      'DIAGNOSTICO_FINALIZADO': { name: 'Diagnóstico Finalizado', color: '#8b5cf6' },
-                      'DIAGNOSTICOFINALIZADO': { name: 'Diagnóstico Finalizado', color: '#8b5cf6' },
-                      'DIAGNOSTICO_ENVIADO': { name: 'Diagnóstico Enviado', color: '#7c3aed' },
-                      'DIAGNOSTICOENVIADO': { name: 'Diagnóstico Enviado', color: '#7c3aed' },
-                      'AGUARDANDO_CONTATO': { name: 'Aguardando Contato', color: '#6366f1' },
-                      'AGUARDANDOCONTATO': { name: 'Aguardando Contato', color: '#6366f1' },
-                    }
-
-                    const mapped = statusMap[key] || { name: item.status, color: '#8b5cf6' }
-
-                    return {
-                      name: mapped.name,
-                      value: item.count,
-                      percentage: item.percentage,
-                      color: mapped.color
-                    }
-                  }) || []}
-                  totalLeads={metrics?.totalLeads}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
       </div>
     </div>
     </>

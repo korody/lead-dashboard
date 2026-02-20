@@ -108,7 +108,7 @@ export function Navigation({ children }: NavigationProps) {
                 <img
                   src="/logo%20mestre%20ye.png"
                   alt="Logo Mestre Ye"
-                  className="w-full h-auto max-w-[180px] object-contain"
+                  className="w-full h-auto max-w-[90px] object-contain"
                 />
               </motion.div>
             </Link>

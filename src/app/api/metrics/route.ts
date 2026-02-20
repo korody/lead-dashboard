@@ -473,7 +473,44 @@ export async function GET(request: Request) {
     const ultimos3 = evolucaoTemporal.slice(-3)
     console.log(`🔍 Últimos 3 dias:`, ultimos3.map(d => `${d.data}: ${d.leads}`).join(' | '))
 
-    
+    // === Evolução do Score Médio por Dia
+    const scoreByDay: Record<string, { sum: number; count: number }> = {}
+    allLeads.forEach(l => {
+      if (l.created_at && l.lead_score != null) {
+        const dataBrasil = toBRT(l.created_at as string)
+        const dia = ymdBRT(dataBrasil)
+        if (!scoreByDay[dia]) scoreByDay[dia] = { sum: 0, count: 0 }
+        scoreByDay[dia].sum += (l.lead_score as number)
+        scoreByDay[dia].count++
+      }
+    })
+    const evolucaoScore = evolucaoTemporal.map(({ data }) => ({
+      data,
+      avgScore: scoreByDay[data]
+        ? parseFloat((scoreByDay[data].sum / scoreByDay[data].count).toFixed(1))
+        : 0
+    }))
+
+    // === Elemento × Qualidade (cruzamento por elemento MTC)
+    const elementoMap: Record<string, { count: number; scoreSum: number; scoreCount: number; vips: number }> = {}
+    allLeads.forEach(l => {
+      const el = l.elemento_principal as string | undefined
+      if (!el) return
+      if (!elementoMap[el]) elementoMap[el] = { count: 0, scoreSum: 0, scoreCount: 0, vips: 0 }
+      elementoMap[el].count++
+      if (l.lead_score != null) {
+        elementoMap[el].scoreSum += (l.lead_score as number)
+        elementoMap[el].scoreCount++
+      }
+      if (l.is_hot_lead_vip === true) elementoMap[el].vips++
+    })
+    const elementoQualidade = Object.entries(elementoMap).map(([elemento, d]) => ({
+      elemento,
+      count: d.count,
+      avgScore: d.scoreCount > 0 ? parseFloat((d.scoreSum / d.scoreCount).toFixed(1)) : 0,
+      vipRate: d.count > 0 ? parseFloat((d.vips / d.count * 100).toFixed(1)) : 0,
+      vipCount: d.vips
+    })).sort((a, b) => b.avgScore - a.avgScore)
 
     // === Quadrantes (Matriz Urgência x Intensidade)
     // Prefer DB-stored `quadrante`, otherwise fallback to priority+lead_score
@@ -653,6 +690,8 @@ export async function GET(request: Request) {
       funil,
       quadrants,
       storedDiagnosticsCount,
+      evolucaoScore,
+      elementoQualidade,
       whatsappLogs,
       vips24h,
       resumo_diario,

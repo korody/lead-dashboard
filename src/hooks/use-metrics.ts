@@ -36,6 +36,8 @@ export interface DashboardMetrics {
     }
   }
   quadrants?: Array<{ id: number; title: string; desc: string; color: string; count: number; percentage: number }>
+  evolucaoScore?: Array<{ data: string; avgScore: number }>
+  elementoQualidade?: Array<{ elemento: string; count: number; avgScore: number; vipRate: number; vipCount: number }>
   whatsappLogs: unknown
   vips24h: Array<unknown>
   resumo_diario: unknown
@@ -50,7 +52,7 @@ export interface DashboardMetrics {
 }
 
 async function fetchMetrics(
-  days: number = 30,
+  days: number | 'custom' = 30,
   startDate?: string,
   endDate?: string,
   utmCampaign?: string,
@@ -60,7 +62,8 @@ async function fetchMetrics(
   // Adiciona timestamp para evitar cache em produção
   const timestamp = new Date().getTime()
   const params = new URLSearchParams()
-  params.set('days', String(days))
+  const daysNum = days === 'custom' ? 9999 : days
+  params.set('days', String(daysNum))
   if (startDate) params.set('startDate', startDate)
   if (endDate) params.set('endDate', endDate)
   if (utmCampaign) params.set('utmCampaign', utmCampaign)
@@ -85,7 +88,7 @@ async function fetchMetrics(
 }
 
 export function useMetrics(
-  days: number = 30,
+  days: number | 'custom' = 30,
   startDate?: string,
   endDate?: string,
   utmCampaign?: string,
@@ -147,7 +150,7 @@ export function useMetrics(
 }
 
 export function useRealTimeMetrics(
-  days: number = 30,
+  days: number | 'custom' = 30,
   startDate?: string,
   endDate?: string,
   utmCampaign?: string,
