@@ -63,6 +63,8 @@ function LeadsPageContent() {
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const { setControls } = useSidebarControls()
   const LEADS_POR_PAGINA = 50
+  const campaignStart = selectedCampaign?.data_inicio ?? undefined
+  const campaignEnd   = selectedCampaign?.data_fim   ?? undefined
 
   // Reset date filter when campaign changes (including null = "Todas")
   useEffect(() => {
@@ -76,12 +78,14 @@ function LeadsPageContent() {
         <DateRangeFilter
           selected={selectedDays}
           onChange={(days) => setSelectedDays(days)}
+          campaignStart={campaignStart}
+          campaignEnd={campaignEnd}
         />
       </div>
     )
     return () => setControls(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDays])
+  }, [selectedDays, campaignStart, campaignEnd])
 
   const getCutoffIso = () => {
     if (selectedDays === 'custom' || (typeof selectedDays === 'number' && selectedDays >= 9999)) {
