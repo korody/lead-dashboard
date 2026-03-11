@@ -60,6 +60,7 @@ function LeadsPageContent() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [loadingExport, setLoadingExport] = useState(false)
   const [selectedDays, setSelectedDays] = useState<DateRangeOption>(9999)
   const { setControls } = useSidebarControls()
   const LEADS_POR_PAGINA = 50
@@ -364,32 +365,76 @@ function LeadsPageContent() {
     }
   }
 
-  const exportarCSV = () => {
-    const headers = ['Nome', 'Email', 'Celular', 'Elemento', 'Score', 'Prioridade', 'Quadrante', 'VIP', 'Aluno', 'BNY-Aluno', 'Data']
-    const rows = leadsOrdenados.map(lead => [
-      lead.nome,
-      lead.email,
-      lead.celular,
-      lead.elemento_principal,
-      lead.lead_score,
-      lead.prioridade,
-      `Q${lead.quadrante}`,
-      lead.is_hot_lead_vip ? 'Sim' : 'Não',
-      lead.is_aluno ? 'Sim' : 'Não',
-      lead.is_aluno_bny2 ? 'Sim' : 'Não',
-  new Date(lead.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-    ])
-    
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+  const exportarCSV = async () => {
+    try {
+      setLoadingExport(true)
+      const BATCH = 1000
+      let allLeads: Lead[] = []
+      let from = 0
+
+      while (true) {
+        let query = supabase
+          .from('quiz_leads')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + BATCH - 1)
+
+        const cutoff = getCutoffIso()
+        if (cutoff) query = query.gte('created_at', cutoff)
+        const endCutoff = getEndCutoffIso()
+        if (endCutoff) query = query.lte('created_at', endCutoff)
+        if (selectedCampaign?.utm_campaign) query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
+        if (searchTerm.trim() !== '') {
+          const like = `%${searchTerm.trim()}%`
+          query = query.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
+        }
+        if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
+        if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
+        if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
+        if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
+        if (filtroAluno === 'SIM') query = query.eq('is_aluno', true)
+        if (filtroAluno === 'NAO') query = query.or('is_aluno.is.null,is_aluno.eq.false')
+        if (filtroAlunoBNY === 'SIM') query = query.eq('is_aluno_bny2', true)
+        if (filtroAlunoBNY === 'NAO') query = query.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
+
+        const { data, error } = await query
+        if (error) throw error
+        if (!data || data.length === 0) break
+        allLeads = allLeads.concat(data)
+        if (data.length < BATCH) break
+        from += BATCH
+      }
+
+      const headers = ['Nome', 'Email', 'Celular', 'Elemento', 'Score', 'Prioridade', 'Quadrante', 'VIP', 'Aluno', 'BNY-Aluno', 'Data']
+      const rows = allLeads.map(lead => [
+        lead.nome,
+        lead.email,
+        lead.celular,
+        lead.elemento_principal,
+        lead.lead_score,
+        lead.prioridade,
+        `Q${lead.quadrante}`,
+        lead.is_hot_lead_vip ? 'Sim' : 'Não',
+        lead.is_aluno ? 'Sim' : 'Não',
+        lead.is_aluno_bny2 ? 'Sim' : 'Não',
+        new Date(lead.created_at).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      ])
+
+      const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `leads-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Erro ao exportar CSV:', err)
+    } finally {
+      setLoadingExport(false)
+    }
   }
 
   const getIconeElemento = (elemento: string) => {
@@ -492,10 +537,11 @@ function LeadsPageContent() {
                 </div>
                 <button
                   onClick={exportarCSV}
-                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
+                  disabled={loadingExport}
+                  className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg transition-all shadow-lg hover:shadow-xl font-semibold"
                 >
                   <Download className="w-5 h-5" />
-                  Exportar CSV
+                  {loadingExport ? 'Exportando...' : 'Exportar CSV'}
                 </button>
               </div>
             </CardHeader>
