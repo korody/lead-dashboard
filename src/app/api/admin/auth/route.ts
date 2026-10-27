@@ -3,11 +3,12 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
   try {
     const { password } = await request.json()
-    const adminPassword = process.env.ADMIN_PASSWORD
+    // Sem ADMIN_PASSWORD própria, vale a senha do painel (esta rota já exige o login dele)
+    const adminPassword = process.env.ADMIN_PASSWORD || process.env.DASHBOARD_PASSWORD
 
     if (!adminPassword) {
       return NextResponse.json(
-        { error: 'ADMIN_PASSWORD not configured' },
+        { error: 'ADMIN_PASSWORD/DASHBOARD_PASSWORD not configured' },
         { status: 500 }
       )
     }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { campaignsApi, fetchLeads } from '@/lib/data-client'
 import type { Campaign } from '@/types/campaign'
 import { motion } from 'framer-motion'
 import { Plus, Trash2, Save, X, LogOut } from 'lucide-react'
@@ -43,23 +43,14 @@ export default function AdminPage() {
 
   const loadCampaigns = async () => {
     try {
-      const { data: campaignsData, error } = await supabase
-        .from('dash_campaigns')
-        .select('*')
-        .order('prioridade', { ascending: true })
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
+      const campaignsData = await campaignsApi.list<Campaign>()
       setCampaigns(campaignsData ?? [])
 
       // Conta leads por campanha usando count exato (sem paginação)
       const utms = campaignsData?.filter(c => c.utm_campaign).map(c => c.utm_campaign as string) ?? []
       const countResults = await Promise.all(
         utms.map(utm =>
-          supabase
-            .from('quiz_leads')
-            .select('*', { count: 'exact', head: true })
-            .ilike('utm_campaign', utm)
+          fetchLeads({ utm, countOnly: true })
             .then(({ count }) => ({ utm: utm.toLowerCase(), count: count ?? 0 }))
         )
       )
@@ -83,9 +74,7 @@ export default function AdminPage() {
 
     setIsLoading(true)
     try {
-      const { error } = await supabase
-        .from('dash_campaigns')
-        .update({
+      await campaignsApi.update(editingId, {
           nome: editForm.nome,
           slug: editForm.slug,
           meta_leads: editForm.meta_leads,
@@ -97,9 +86,6 @@ export default function AdminPage() {
           prioridade: editForm.prioridade ?? 0,
           ativo: editForm.ativo,
         })
-        .eq('id', editingId)
-
-      if (error) throw error
 
       toast.success('Campanha atualizada com sucesso!')
       setEditingId(null)
@@ -117,12 +103,7 @@ export default function AdminPage() {
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza que deseja deletar esta campanha?')) {
       try {
-        const { error } = await supabase
-          .from('dash_campaigns')
-          .delete()
-          .eq('id', id)
-
-        if (error) throw error
+        await campaignsApi.remove(id)
 
         toast.success('Campanha deletada com sucesso!')
         loadCampaigns()
@@ -138,7 +119,7 @@ export default function AdminPage() {
       const maxPrioridade = campaigns.length > 0
         ? Math.max(...campaigns.map(c => c.prioridade ?? 0)) + 1
         : 0
-      const { error } = await supabase.from('dash_campaigns').insert({
+      await campaignsApi.create({
         slug: `campaign-${Date.now()}`,
         nome: 'Nova Campanha',
         meta_leads: 10000,
@@ -148,8 +129,6 @@ export default function AdminPage() {
         prioridade: maxPrioridade,
         ativo: true,
       })
-
-      if (error) throw error
 
       toast.success('Campanha criada com sucesso!')
       loadCampaigns()

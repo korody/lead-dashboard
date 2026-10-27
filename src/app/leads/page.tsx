@@ -9,7 +9,7 @@ import {
   Search, Filter, Download, Flame, ChevronDown, ChevronUp,
   SortAsc, SortDesc, Users, Target, X
 } from "lucide-react"
-import { supabase } from '../../lib/supabase'
+import { fetchLeads, type LeadsQuery } from '../../lib/data-client'
 import { ELEMENTOS_MTC } from '../../lib/constants'
 import { LeadDetailModal } from '../../components/ui/lead-detail-modal'
 import { DateRangeFilter, DateRangeOption } from '../../components/ui/date-range-filter'
@@ -138,13 +138,8 @@ function LeadsPageContent() {
 
   const carregarLeadPorId = async (leadId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('quiz_leads')
-        .select('*')
-        .eq('id', leadId)
-        .single()
-      
-      if (error) throw error
+      const { data: rows } = await fetchLeads<Lead>({ id: leadId, limit: 1 })
+      const data = rows[0]
       if (data) {
         setSelectedLead(data)
         setIsModalOpen(true)
@@ -173,92 +168,33 @@ function LeadsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroElemento, filtroPrioridade, filtroQuadrante, filtroVIP, filtroAluno, filtroAlunoBNY, searchTerm, selectedDays, isMounted, selectedCampaign?.id])
 
+  // Período e campanha selecionados (valem para todas as consultas)
+  const filtroBase = (): LeadsQuery => ({
+    cutoff: getCutoffIso(),
+    endCutoff: getEndCutoffIso(),
+    utm: selectedCampaign?.utm_campaign || null,
+  })
+
+  // Período, campanha, busca e filtros da tela
+  const filtrosAtuais = (): LeadsQuery => ({
+    ...filtroBase(),
+    search: searchTerm.trim() || undefined,
+    elemento: filtroElemento !== 'TODOS' ? filtroElemento : undefined,
+    prioridade: filtroPrioridade !== 'TODOS' ? filtroPrioridade : undefined,
+    quadrante: filtroQuadrante !== 'TODOS' ? parseInt(filtroQuadrante) : undefined,
+    vip: filtroVIP || undefined,
+    aluno: filtroAluno === 'SIM' || filtroAluno === 'NAO' ? filtroAluno : undefined,
+    alunoBny: filtroAlunoBNY === 'SIM' || filtroAlunoBNY === 'NAO' ? filtroAlunoBNY : undefined,
+  })
+
   const buscarComFiltros = async () => {
     try {
       setLoadingSearch(true)
 
-      // Query para dados
-      let query = supabase
-        .from('quiz_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const { data, count } = await fetchLeads<Lead>({ ...filtrosAtuais(), limit: 2000, withCount: true })
 
-      // Query para contagem
-      let countQuery = supabase
-        .from('quiz_leads')
-        .select('*', { count: 'exact', head: true })
-
-      // Apply date filter
-      const cutoff = getCutoffIso()
-      if (cutoff) {
-        query = query.gte('created_at', cutoff)
-        countQuery = countQuery.gte('created_at', cutoff)
-      }
-
-      const endCutoff = getEndCutoffIso()
-      if (endCutoff) {
-        query = query.lte('created_at', endCutoff)
-        countQuery = countQuery.lte('created_at', endCutoff)
-      }
-
-      // Apply campaign UTM filter - filter by campaign origin
-      if (selectedCampaign?.utm_campaign) {
-        query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
-        countQuery = countQuery.ilike('utm_campaign', selectedCampaign.utm_campaign)
-      }
-
-      // Apply search term if exists
-      if (searchTerm.trim() !== '') {
-        const like = `%${searchTerm.trim()}%`
-        query = query.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
-        countQuery = countQuery.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
-      }
-
-      // Apply filters
-      if (filtroElemento !== 'TODOS') {
-        query = query.eq('elemento_principal', filtroElemento)
-        countQuery = countQuery.eq('elemento_principal', filtroElemento)
-      }
-      if (filtroPrioridade !== 'TODOS') {
-        query = query.eq('prioridade', filtroPrioridade)
-        countQuery = countQuery.eq('prioridade', filtroPrioridade)
-      }
-      if (filtroQuadrante !== 'TODOS') {
-        query = query.eq('quadrante', parseInt(filtroQuadrante))
-        countQuery = countQuery.eq('quadrante', parseInt(filtroQuadrante))
-      }
-      if (filtroVIP) {
-        query = query.eq('is_hot_lead_vip', true)
-        countQuery = countQuery.eq('is_hot_lead_vip', true)
-      }
-      if (filtroAluno === 'SIM') {
-        query = query.eq('is_aluno', true)
-        countQuery = countQuery.eq('is_aluno', true)
-      }
-      if (filtroAluno === 'NAO') {
-        query = query.or('is_aluno.is.null,is_aluno.eq.false')
-        countQuery = countQuery.or('is_aluno.is.null,is_aluno.eq.false')
-      }
-      if (filtroAlunoBNY === 'SIM') {
-        query = query.eq('is_aluno_bny2', true)
-        countQuery = countQuery.eq('is_aluno_bny2', true)
-      }
-      if (filtroAlunoBNY === 'NAO') {
-        query = query.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
-        countQuery = countQuery.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
-      }
-
-      // Buscar dados e contagem em paralelo
-      const [dataResult, countResult] = await Promise.all([
-        query.limit(2000),
-        countQuery
-      ])
-      
-      if (dataResult.error) throw dataResult.error
-      if (countResult.error) throw countResult.error
-      
-      setLeads(dataResult.data || [])
-      setTotalLeads(countResult.count || 0)
+      setLeads(data || [])
+      setTotalLeads(count || 0)
       setPaginaAtual(1)
       setIsSearching(true)
     } catch (err) {
@@ -270,16 +206,7 @@ function LeadsPageContent() {
 
   const buscarTotalSupabase = async () => {
     try {
-      let query = supabase
-        .from('quiz_leads')
-        .select('*', { count: 'exact', head: true })
-      const cutoff = getCutoffIso()
-      if (cutoff) query = query.gte('created_at', cutoff)
-      const endCutoff = getEndCutoffIso()
-      if (endCutoff) query = query.lte('created_at', endCutoff)
-      if (selectedCampaign?.utm_campaign) query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
-      const { count, error } = await query
-      if (error) throw error
+      const { count } = await fetchLeads({ ...filtroBase(), countOnly: true })
       setTotalLeads(count || 0)
     } catch (error) {
       console.error('Erro ao buscar total do Supabase:', error)
@@ -290,18 +217,7 @@ function LeadsPageContent() {
     try {
       setLoading(true)
       setIsSearching(false)
-      let query = supabase
-        .from('quiz_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(0, LEADS_POR_PAGINA - 1)
-      const cutoff = getCutoffIso()
-      if (cutoff) query = query.gte('created_at', cutoff)
-      const endCutoff = getEndCutoffIso()
-      if (endCutoff) query = query.lte('created_at', endCutoff)
-      if (selectedCampaign?.utm_campaign) query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
-      const { data, error } = await query
-      if (error) throw error
+      const { data } = await fetchLeads<Lead>({ ...filtroBase(), from: 0, to: LEADS_POR_PAGINA - 1 })
       setLeads(data || [])
       setPaginaAtual(1)
     } catch (error) {
@@ -317,18 +233,7 @@ function LeadsPageContent() {
       const proximaPagina = paginaAtual + 1
       const inicio = (proximaPagina - 1) * LEADS_POR_PAGINA
       const fim = inicio + LEADS_POR_PAGINA - 1
-      let query = supabase
-        .from('quiz_leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(inicio, fim)
-      const cutoff = getCutoffIso()
-      if (cutoff) query = query.gte('created_at', cutoff)
-      const endCutoff = getEndCutoffIso()
-      if (endCutoff) query = query.lte('created_at', endCutoff)
-      if (selectedCampaign?.utm_campaign) query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
-      const { data, error } = await query
-      if (error) throw error
+      const { data } = await fetchLeads<Lead>({ ...filtroBase(), from: inicio, to: fim })
       setLeads(prev => [...prev, ...(data || [])])
       setPaginaAtual(proximaPagina)
     } catch (error) {
@@ -373,32 +278,7 @@ function LeadsPageContent() {
       let from = 0
 
       while (true) {
-        let query = supabase
-          .from('quiz_leads')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .range(from, from + BATCH - 1)
-
-        const cutoff = getCutoffIso()
-        if (cutoff) query = query.gte('created_at', cutoff)
-        const endCutoff = getEndCutoffIso()
-        if (endCutoff) query = query.lte('created_at', endCutoff)
-        if (selectedCampaign?.utm_campaign) query = query.ilike('utm_campaign', selectedCampaign.utm_campaign)
-        if (searchTerm.trim() !== '') {
-          const like = `%${searchTerm.trim()}%`
-          query = query.or(`nome.ilike.${like},email.ilike.${like},celular.ilike.${like}`)
-        }
-        if (filtroElemento !== 'TODOS') query = query.eq('elemento_principal', filtroElemento)
-        if (filtroPrioridade !== 'TODOS') query = query.eq('prioridade', filtroPrioridade)
-        if (filtroQuadrante !== 'TODOS') query = query.eq('quadrante', parseInt(filtroQuadrante))
-        if (filtroVIP) query = query.eq('is_hot_lead_vip', true)
-        if (filtroAluno === 'SIM') query = query.eq('is_aluno', true)
-        if (filtroAluno === 'NAO') query = query.or('is_aluno.is.null,is_aluno.eq.false')
-        if (filtroAlunoBNY === 'SIM') query = query.eq('is_aluno_bny2', true)
-        if (filtroAlunoBNY === 'NAO') query = query.or('is_aluno_bny2.is.null,is_aluno_bny2.eq.false')
-
-        const { data, error } = await query
-        if (error) throw error
+        const { data } = await fetchLeads<Lead>({ ...filtrosAtuais(), from, to: from + BATCH - 1 })
         if (!data || data.length === 0) break
         allLeads = allLeads.concat(data)
         if (data.length < BATCH) break

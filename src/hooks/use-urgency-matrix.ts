@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { fetchLeads } from '@/lib/data-client'
 
 export interface QuadrantData {
   quadrante: number
@@ -27,11 +27,6 @@ export function useUrgencyMatrix(refreshKey?: number) {
       try {
         setData(prev => ({ ...prev, loading: true, error: null }))
 
-        // Validar se o Supabase está configurado
-        if (!supabase) {
-          throw new Error('Supabase client não está configurado')
-        }
-        
         // IMPORTANTE: A tabela é chamada 'quiz_leads' no Supabase, não 'leads'
         // Buscar TODOS os leads (mesma base que o funil usa)
         // A API já faz busca em batch de todos os leads, aqui fazemos o mesmo
@@ -40,16 +35,13 @@ export function useUrgencyMatrix(refreshKey?: number) {
         const batchSize = 1000
         
         while (true) {
-          const { data, error } = await supabase
-            .from('quiz_leads')
-            .select('quadrante, elemento_principal')
-            .order('id', { ascending: true })
-            .range(start, start + batchSize - 1)
-          
-          if (error) {
-            console.error('❌ Error loading leads batch:', error)
-            throw new Error(`Failed to load leads: ${error.message}`)
-          }
+          const { data } = await fetchLeads<{ quadrante: number | null; elemento_principal?: string | null }>({
+            select: 'quadrante, elemento_principal',
+            orderBy: 'id',
+            ascending: true,
+            from: start,
+            to: start + batchSize - 1,
+          })
           
           if (!data || data.length === 0) break
           

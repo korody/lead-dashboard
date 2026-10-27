@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
+import { campaignsApi } from '@/lib/data-client'
 import type { Campaign, CampaignContextValue } from '@/types/campaign'
 
 const CampaignContext = createContext<CampaignContextValue | undefined>(undefined)
@@ -14,13 +14,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function load() {
       try {
-        const { data, error } = await supabase
-          .from('dash_campaigns')
-          .select('*')
-          .order('prioridade', { ascending: true })
-          .order('created_at', { ascending: true })
-
-        if (error) throw error
+        const data = await campaignsApi.list<Campaign>()
 
         if (data && data.length > 0) {
           setCampaigns(data)
